@@ -71,10 +71,12 @@ impl<S: Scratchpad> Pipeline<S> {
 
         for stage in self.stages.iter_mut() {
             if self.retries == 0 {
-                stage.run(ctx).map_err(|e| PipelineError::StageFailed(format!("{:?}", e)))?;
+                stage
+                    .run(ctx)
+                    .map_err(|e| PipelineError::StageFailed(format!("{:?}", e)))?;
             } else {
                 let mut last_error = None;
-        
+
                 for attempt in 0..=self.retries {
                     match stage.run(ctx) {
                         Ok(()) => {
@@ -89,7 +91,7 @@ impl<S: Scratchpad> Pipeline<S> {
                         }
                     }
                 }
-        
+
                 if let Some(e) = last_error {
                     return Err(PipelineError::RetryExhausted {
                         attempts: self.retries + 1,
@@ -102,7 +104,6 @@ impl<S: Scratchpad> Pipeline<S> {
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -201,6 +202,9 @@ mod tests {
         let mut pipeline = Pipeline::new();
         pipeline.add_stage(FailingStage);
         let mut ctx = TestScratchpad::new(1.0);
-        assert!(matches!(pipeline.run(&mut ctx), Err(PipelineError::StageFailed(_))));
+        assert!(matches!(
+            pipeline.run(&mut ctx),
+            Err(PipelineError::StageFailed(_))
+        ));
     }
 }
