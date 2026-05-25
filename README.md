@@ -1,4 +1,4 @@
-# High-Performance Scratchpad in Rust
+# pipex — A Generic Pipeline Execution Library in Rust
 
 ## About This Project
 
@@ -30,50 +30,56 @@ This produces repeated heap allocations, unnecessary copies, and allocator overh
 
 ## Core Architecture
 
-A scratchpad struct holds all intermediate buffers:
+`pipex` is built around three concepts:
+
+**Scratchpad** — a trait you implement on your own struct. Defines `reset()` and `validate()`, called by the pipeline at the right moments. Your struct holds whatever buffers your application needs.
 
 ```rust
-pub struct Scratchpad {
-    pub values: Vec<f32>,
-    pub temp: Vec<f32>,
+struct MyScratchpad {
+    values: Vec<f32>,
+    temp: Vec<f32>,
+}
+
+impl Scratchpad for MyScratchpad {
+    fn reset(&mut self) { self.values.clear(); self.temp.clear(); }
+    fn validate(&self) -> bool { true }
 }
 ```
 
-Computation stages are defined via a trait:
+**Stage** — a trait you implement for each computation step. Receives a mutable reference to the scratchpad, reads what it needs, and writes its output back in place.
 
 ```rust
-pub trait Stage<Ctx> {
-    fn run(&mut self, ctx: &mut Ctx);
-}
-```
+struct DoubleValues;
 
-Each stage takes a mutable reference to the scratchpad, reads what it needs, and writes its output back in place:
-
-```rust
-struct MultiplyByTwo;
-
-impl Stage<Scratchpad> for MultiplyByTwo {
-    fn run(&mut self, ctx: &mut Scratchpad) {
-        for x in ctx.values.iter_mut() {
-            *x *= 2.0;
-        }
+impl Stage<MyScratchpad> for DoubleValues {
+    fn run(&mut self, ctx: &mut MyScratchpad) -> Result<(), PipelineError> {
+        for x in ctx.values.iter_mut() { *x *= 2.0; }
+        Ok(())
     }
 }
 ```
 
+**Pipeline** — holds a sequence of stages and runs them in order against the scratchpad. Handles validation, reset between runs, and retries on failure.
+
+```rust
+let mut pipeline = Pipeline::new().with_retries(3);
+pipeline.add_stage(DoubleValues);
+pipeline.run(&mut scratchpad)?;
+```
+
 ---
 
-## Dispatch: Static vs Dynamic
+## Dispatch
 
-**Static dispatch** (`fn run_stage<S: Stage<Ctx>>`)
-- Performance: maximum — inlined and monomorphized by the compiler
-- Flexibility: fixed at compile time
+`pipex` uses dynamic dispatch to store stages in the pipeline:
 
-**Dynamic dispatch** (`Box<dyn Stage<Ctx>>`)
-- Performance: slight overhead from vtable lookups
-- Flexibility: configurable at runtime
+```rust
+stages: Vec<Box<dyn Stage<S>>>
+```
 
-For performance-critical paths, prefer static dispatch. Avoid `Rc<RefCell<T>>`, `Arc<Mutex<T>>`, and `HashMap<TypeId, Box<dyn Any>>` in hot loops — these introduce indirection and cache misses that undermine the scratchpad's purpose.
+This allows the pipeline to hold stages of different types in the same collection at runtime. The tradeoff is a small overhead from vtable lookups on each stage call, which is acceptable for a pipeline execution library where flexibility is more important than micro-optimising individual calls.
+
+For the same reason, avoid using `pipex` in tight inner loops where every nanosecond counts. It is best suited for coarse-grained pipelines where each stage does a meaningful amount of work.
 
 ---
 
@@ -90,4 +96,15 @@ For performance-critical paths, prefer static dispatch. Avoid `Rc<RefCell<T>>`, 
 
 ## Future Extensions
 
-Possible additions as the project matures: SIMD operations, arena allocation, buffer pooling, parallel execution, task graphs.
+**Performance**
+- Static dispatch pipeline variant to eliminate vtable overhead and enable compiler inlining
+- Remove retry logic from the core execution loop — retries should be an opt-in wrapper, not baked into the hot path
+- Cache-line alignment hints on scratchpad buffers to reduce CPU cache misses
+- Zero allocation guarantee post-initialisation, with documentation and tests to enforce it
+- Benchmarking via `criterion` comparing `pipex` against naive allocation-per-stage pipelines
+
+**Features**
+- Parallel stage execution
+- Arena allocation support
+- Buffer pooling
+- Task graphs
