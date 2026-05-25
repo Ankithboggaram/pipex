@@ -111,7 +111,10 @@ mod tests {
 
     impl TestScratchpad {
         fn new(value: f32) -> Self {
-            Self { value, is_valid: true }
+            Self {
+                value,
+                is_valid: true,
+            }
         }
     }
 
@@ -140,7 +143,9 @@ mod tests {
 
     impl Stage<TestScratchpad> for FailingStage {
         fn run(&mut self, _ctx: &mut TestScratchpad) -> Result<(), PipelineError> {
-            Err(PipelineError::StageFailed(String::from("intentional failure")))
+            Err(PipelineError::StageFailed(String::from(
+                "intentional failure",
+            )))
         }
     }
 
@@ -148,7 +153,10 @@ mod tests {
     fn empty_pipeline_returns_error() {
         let mut pipeline: Pipeline<TestScratchpad> = Pipeline::new();
         let mut ctx = TestScratchpad::new(1.0);
-        assert!(matches!(pipeline.run(&mut ctx), Err(PipelineError::EmptyPipeline)));
+        assert!(matches!(
+            pipeline.run(&mut ctx),
+            Err(PipelineError::EmptyPipeline)
+        ));
     }
 
     #[test]
@@ -157,7 +165,10 @@ mod tests {
         pipeline.add_stage(DoubleStage);
         let mut ctx = TestScratchpad::new(1.0);
         ctx.is_valid = false;
-        assert!(matches!(pipeline.run(&mut ctx), Err(PipelineError::ValidationFailed(_))));
+        assert!(matches!(
+            pipeline.run(&mut ctx),
+            Err(PipelineError::ValidationFailed(_))
+        ));
     }
 
     #[test]
@@ -174,6 +185,9 @@ mod tests {
         let mut pipeline = Pipeline::new().with_retries(2);
         pipeline.add_stage(FailingStage);
         let mut ctx = TestScratchpad::new(1.0);
-        assert!(matches!(pipeline.run(&mut ctx), Err(PipelineError::RetryExhausted { attempts: 3, .. })));
+        assert!(matches!(
+            pipeline.run(&mut ctx),
+            Err(PipelineError::RetryExhausted { attempts: 3, .. })
+        ));
     }
 }
