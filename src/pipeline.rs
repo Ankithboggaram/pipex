@@ -9,8 +9,16 @@ use crate::stage::Stage;
 /// # Example
 /// ```
 /// use pipex::pipeline::Pipeline;
+/// use pipex::scratchpad::Scratchpad;
 ///
-/// let pipeline = Pipeline::new()
+/// struct MyScratchpad;
+///
+/// impl Scratchpad for MyScratchpad {
+///     fn reset(&mut self) {}
+///     fn validate(&self) -> bool { true }
+/// }
+///
+/// let pipeline: Pipeline<MyScratchpad> = Pipeline::new()
 ///     .with_retries(3);
 /// ```
 pub struct Pipeline<S: Scratchpad> {
@@ -18,6 +26,12 @@ pub struct Pipeline<S: Scratchpad> {
     stages: Vec<Box<dyn Stage<S>>>,
     /// The number of times to retry a failed stage before giving up.
     retries: u32,
+}
+
+impl<S: Scratchpad> Default for Pipeline<S> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<S: Scratchpad> Pipeline<S> {
@@ -50,9 +64,9 @@ impl<S: Scratchpad> Pipeline<S> {
         }
 
         if !ctx.validate() {
-            return Err(PipelineError::ValidationFailed(
-                String::from("Scratchpad failed validation before pipeline execution"),
-            ));
+            return Err(PipelineError::ValidationFailed(String::from(
+                "Scratchpad failed validation before pipeline execution",
+            )));
         }
 
         for stage in self.stages.iter_mut() {
