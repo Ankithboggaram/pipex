@@ -98,3 +98,82 @@ impl<S: Scratchpad> Pipeline<S> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // A minimal scratchpad for testing
+    struct TestScratchpad {
+        value: f32,
+        is_valid: bool,
+    }
+
+    impl TestScratchpad {
+        fn new(value: f32) -> Self {
+            Self { value, is_valid: true }
+        }
+    }
+
+    impl Scratchpad for TestScratchpad {
+        fn reset(&mut self) {
+            self.value = 0.0;
+        }
+
+        fn validate(&self) -> bool {
+            self.is_valid
+        }
+    }
+
+    // A stage that doubles the value
+    struct DoubleStage;
+
+    impl Stage<TestScratchpad> for DoubleStage {
+        fn run(&mut self, ctx: &mut TestScratchpad) -> Result<(), PipelineError> {
+            ctx.value *= 2.0;
+            Ok(())
+        }
+    }
+
+    // A stage that always fails
+    struct FailingStage;
+
+    impl Stage<TestScratchpad> for FailingStage {
+        fn run(&mut self, _ctx: &mut TestScratchpad) -> Result<(), PipelineError> {
+            Err(PipelineError::StageFailed(String::from("intentional failure")))
+        }
+    }
+
+    #[test]
+    fn empty_pipeline_returns_error() {
+        let mut pipeline: Pipeline<TestScratchpad> = Pipeline::new();
+        let mut ctx = TestScratchpad::new(1.0);
+        assert!(matches!(pipeline.run(&mut ctx), Err(PipelineError::EmptyPipeline)));
+    }
+
+    #[test]
+    fn validation_failure_blocks_execution() {
+        let mut pipeline = Pipeline::new();
+        pipeline.add_stage(DoubleStage);
+        let mut ctx = TestScratchpad::new(1.0);
+        ctx.is_valid = false;
+        assert!(matches!(pipeline.run(&mut ctx), Err(PipelineError::ValidationFailed(_))));
+    }
+
+    #[test]
+    fn stage_runs_and_modifies_scratchpad() {
+        let mut pipeline = Pipeline::new();
+        pipeline.add_stage(DoubleStage);
+        let mut ctx = TestScratchpad::new(2.0);
+        assert!(pipeline.run(&mut ctx).is_ok());
+        assert_eq!(ctx.value, 4.0);
+    }
+
+    #[test]
+    fn failing_stage_exhausts_retries() {
+        let mut pipeline = Pipeline::new().with_retries(2);
+        pipeline.add_stage(FailingStage);
+        let mut ctx = TestScratchpad::new(1.0);
+        assert!(matches!(pipeline.run(&mut ctx), Err(PipelineError::RetryExhausted { attempts: 3, .. })));
+    }
+}
