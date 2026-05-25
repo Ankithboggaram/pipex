@@ -21,6 +21,7 @@ pub enum PipelineError {
     RetryExhausted { attempts: u32, reason: String },
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;

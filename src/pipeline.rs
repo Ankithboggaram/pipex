@@ -70,34 +70,39 @@ impl<S: Scratchpad> Pipeline<S> {
         }
 
         for stage in self.stages.iter_mut() {
-            let mut last_error = None;
-
-            for attempt in 0..=self.retries {
-                match stage.run(ctx) {
-                    Ok(()) => {
-                        last_error = None;
-                        break;
-                    }
-                    Err(e) => {
-                        last_error = Some(e);
-                        if attempt < self.retries {
-                            ctx.reset();
+            if self.retries == 0 {
+                stage.run(ctx).map_err(|e| PipelineError::StageFailed(format!("{:?}", e)))?;
+            } else {
+                let mut last_error = None;
+        
+                for attempt in 0..=self.retries {
+                    match stage.run(ctx) {
+                        Ok(()) => {
+                            last_error = None;
+                            break;
+                        }
+                        Err(e) => {
+                            last_error = Some(e);
+                            if attempt < self.retries {
+                                ctx.reset();
+                            }
                         }
                     }
                 }
-            }
-
-            if let Some(e) = last_error {
-                return Err(PipelineError::RetryExhausted {
-                    attempts: self.retries + 1,
-                    reason: format!("{:?}", e),
-                });
+        
+                if let Some(e) = last_error {
+                    return Err(PipelineError::RetryExhausted {
+                        attempts: self.retries + 1,
+                        reason: format!("{:?}", e),
+                    });
+                }
             }
         }
 
         Ok(())
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -189,5 +194,13 @@ mod tests {
             pipeline.run(&mut ctx),
             Err(PipelineError::RetryExhausted { attempts: 3, .. })
         ));
+    }
+
+    #[test]
+    fn failing_stage_with_no_retries_returns_stage_failed() {
+        let mut pipeline = Pipeline::new();
+        pipeline.add_stage(FailingStage);
+        let mut ctx = TestScratchpad::new(1.0);
+        assert!(matches!(pipeline.run(&mut ctx), Err(PipelineError::StageFailed(_))));
     }
 }
