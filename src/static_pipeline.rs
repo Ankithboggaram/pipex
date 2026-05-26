@@ -34,6 +34,7 @@ type StageFn<S> = fn(&mut S) -> Result<(), PipelineError>;
 pub struct Pipeline<S: Scratchpad, const N: usize> {
     stages: [Option<StageFn<S>>; N],
     count: usize,
+    validated: bool,
 }
 
 impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
@@ -42,6 +43,7 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
         Self {
             stages: [None; N],
             count: 0,
+            validated: false,
         }
     }
 
@@ -60,15 +62,19 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
     }
 
     /// Runs all stages in order against the provided scratchpad.
+    #[inline]
     pub fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
         if self.count == 0 {
             return Err(PipelineError::EmptyPipeline);
         }
 
-        if !ctx.validate() {
-            return Err(PipelineError::ValidationFailed(String::from(
-                "scratchpad failed validation before pipeline execution",
-            )));
+        if !self.validated {
+            if !ctx.validate() {
+                return Err(PipelineError::ValidationFailed(String::from(
+                    "scratchpad failed validation before pipeline execution",
+                )));
+            }
+            self.validated = true;
         }
 
         for i in 0..self.count {

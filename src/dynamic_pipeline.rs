@@ -27,6 +27,7 @@ use crate::stage::Stage;
 pub struct Pipeline<S: Scratchpad> {
     /// The sequence of stages to execute.
     stages: Vec<Box<dyn Stage<S>>>,
+    validated: bool,
 }
 
 impl<S: Scratchpad> Default for Pipeline<S> {
@@ -38,7 +39,10 @@ impl<S: Scratchpad> Default for Pipeline<S> {
 impl<S: Scratchpad> Pipeline<S> {
     /// Creates a new empty pipeline with no retries.
     pub fn new() -> Self {
-        Self { stages: Vec::new() }
+        Self {
+            stages: Vec::new(),
+            validated: false,
+        }
     }
 
     /// Adds a stage to the pipeline.
@@ -50,15 +54,19 @@ impl<S: Scratchpad> Pipeline<S> {
     ///
     /// Validates the scratchpad before execution, and resets it
     /// between pipeline runs.
+    #[inline]
     pub fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
         if self.stages.is_empty() {
             return Err(PipelineError::EmptyPipeline);
         }
 
-        if !ctx.validate() {
-            return Err(PipelineError::ValidationFailed(String::from(
-                "Scratchpad failed validation before pipeline execution",
-            )));
+        if !self.validated {
+            if !ctx.validate() {
+                return Err(PipelineError::ValidationFailed(String::from(
+                    "scratchpad failed validation before pipeline execution",
+                )));
+            }
+            self.validated = true;
         }
 
         for stage in self.stages.iter_mut() {
