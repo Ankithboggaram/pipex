@@ -82,15 +82,71 @@ pipeline.run(&mut scratchpad)?;
 
 ---
 
+## Benchmarks
+
+Measured on Apple Silicon using [divan](https://github.com/nvzqz/divan). Scratchpad pre-allocated outside the measured loop to reflect real production usage where the scratchpad is long-lived and reused across runs.
+
+### Scratchpad vs Naive Allocation (single stage)
+
+| Data Size | Dynamic | Static | Naive | Speedup vs Naive |
+|---|---|---|---|---|
+| 100 elements | 24 ns | 23 ns | 65 ns | ~2.8x |
+| 10,000 elements | 1.7 µs | 1.1 µs | 2.5 µs | ~2.3x |
+| 1,000,000 elements | 95 µs | 96 µs | 238 µs | ~2.5x |
+
+The scratchpad pattern is consistently **~2.5x faster** than naive per-stage allocation across all data sizes.
+
+### Static vs Dynamic Dispatch (3 stages, data volume)
+
+| Data Size | Dynamic | Static | Static Advantage |
+|---|---|---|---|
+| 100 elements | 25 ns | 24 ns | ~4% |
+| 10,000 elements | 2.1 µs | 2.1 µs | negligible |
+| 1,000,000 elements | 204 µs | 205 µs | negligible |
+
+At large data sizes, memory bandwidth dominates and dispatch method becomes irrelevant. Static pipeline shows its advantage at smaller sizes where vtable overhead is proportionally larger.
+
+### Scaling (10,000 elements)
+
+| Stages | Dynamic | Static |
+|---|---|---|
+| 1 | 1.2 µs | 1.6 µs |
+| 5 | 7.7 µs | 7.7 µs |
+| 10 | 14.7 µs | 14.9 µs |
+
+Both pipelines scale linearly with stage count. No compounding overhead as stages increase.
+
+### Retry Overhead (10,000 elements, no retries triggered)
+
+| | Median |
+|---|---|
+| Plain stage | 1.6 µs |
+| Retry wrapped | 1.6 µs |
+
+The `Retry` wrapper adds zero measurable overhead when no retries are triggered.
+
+### Mixed Stage Types (dynamic pipeline, 10,000 elements)
+
+| Stages | Median |
+|---|---|
+| 3 mixed | 2.2 µs |
+| 5 mixed | 8.0 µs |
+| 10 mixed | 15.3 µs |
+
+Using genuinely different stage types in the same pipeline has no performance penalty compared to same-type stages.
+
+---
+
 ## Future Extensions
 
 **Performance**
 - [x] Static dispatch pipeline variant: implemented as `static_pipeline::Pipeline`
 - [x] Remove retry logic from the core execution loop: retries are now zero-cost when set to 0
-- [ ] Type chaining static pipeline for full compiler inlining across stage boundaries
+- [x] Inline hints on hot path methods
+- [x] Skip validation after first successful run
+- [x] Benchmarking via `divan` across data sizes, stage counts, and dispatch methods
 - [ ] Cache-line alignment hints on scratchpad buffers to reduce CPU cache misses
 - [ ] Zero allocation guarantee post-initialisation, with documentation and tests to enforce it
-- [ ] Benchmarking via `criterion` comparing `pipex` against naive allocation-per-stage pipelines
 - [ ] SIMD support for numeric data pipelines
 
 **Features**
@@ -114,3 +170,4 @@ pipeline.run(&mut scratchpad)?;
 - **Doc comments and doctests**: documentation that is automatically tested by `cargo test`
 - **Pattern matching**: using `match`, `if let`, and `matches!` for expressive control flow
 - **Decorator pattern**: wrapping stages with additional behaviour via `Retry`
+- 
