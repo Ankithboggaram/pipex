@@ -22,14 +22,11 @@ use crate::stage::Stage;
 ///     fn validate(&self) -> bool { true }
 /// }
 ///
-/// let pipeline: Pipeline<MyScratchpad> = Pipeline::new()
-///     .with_retries(3);
+/// let pipeline: Pipeline<MyScratchpad> = Pipeline::new();
 /// ```
 pub struct Pipeline<S: Scratchpad> {
     /// The sequence of stages to execute.
     stages: Vec<Box<dyn Stage<S>>>,
-    /// The number of times to retry a failed stage before giving up.
-    retries: u32,
 }
 
 impl<S: Scratchpad> Default for Pipeline<S> {
@@ -41,16 +38,7 @@ impl<S: Scratchpad> Default for Pipeline<S> {
 impl<S: Scratchpad> Pipeline<S> {
     /// Creates a new empty pipeline with no retries.
     pub fn new() -> Self {
-        Self {
-            stages: Vec::new(),
-            retries: 0,
-        }
-    }
-
-    /// Sets the number of retries for failed stages.
-    pub fn with_retries(mut self, retries: u32) -> Self {
-        self.retries = retries;
-        self
+        Self { stages: Vec::new() }
     }
 
     /// Adds a stage to the pipeline.
@@ -74,35 +62,9 @@ impl<S: Scratchpad> Pipeline<S> {
         }
 
         for stage in self.stages.iter_mut() {
-            if self.retries == 0 {
-                stage
-                    .run(ctx)
-                    .map_err(|e| PipelineError::StageFailed(format!("{:?}", e)))?;
-            } else {
-                let mut last_error = None;
-
-                for attempt in 0..=self.retries {
-                    match stage.run(ctx) {
-                        Ok(()) => {
-                            last_error = None;
-                            break;
-                        }
-                        Err(e) => {
-                            last_error = Some(e);
-                            if attempt < self.retries {
-                                ctx.reset();
-                            }
-                        }
-                    }
-                }
-
-                if let Some(e) = last_error {
-                    return Err(PipelineError::RetryExhausted {
-                        attempts: self.retries + 1,
-                        reason: format!("{:?}", e),
-                    });
-                }
-            }
+            stage
+                .run(ctx)
+                .map_err(|e| PipelineError::StageFailed(format!("{:?}", e)))?;
         }
 
         Ok(())
@@ -113,7 +75,6 @@ impl<S: Scratchpad> Pipeline<S> {
 mod tests {
     use super::*;
 
-    // A minimal scratchpad for testing
     struct TestScratchpad {
         value: f32,
         is_valid: bool,
@@ -138,7 +99,6 @@ mod tests {
         }
     }
 
-    // A stage that doubles the value
     struct DoubleStage;
 
     impl Stage<TestScratchpad> for DoubleStage {
@@ -148,7 +108,6 @@ mod tests {
         }
     }
 
-    // A stage that always fails
     struct FailingStage;
 
     impl Stage<TestScratchpad> for FailingStage {
@@ -191,18 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn failing_stage_exhausts_retries() {
-        let mut pipeline = Pipeline::new().with_retries(2);
-        pipeline.add_stage(FailingStage);
-        let mut ctx = TestScratchpad::new(1.0);
-        assert!(matches!(
-            pipeline.run(&mut ctx),
-            Err(PipelineError::RetryExhausted { attempts: 3, .. })
-        ));
-    }
-
-    #[test]
-    fn failing_stage_with_no_retries_returns_stage_failed() {
+    fn failing_stage_returns_error() {
         let mut pipeline = Pipeline::new();
         pipeline.add_stage(FailingStage);
         let mut ctx = TestScratchpad::new(1.0);

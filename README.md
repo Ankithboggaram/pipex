@@ -37,11 +37,10 @@ impl Stage<MyScratchpad> for DoubleValues {
 }
 ```
 
-**Pipeline**: the executor that runs stages in sequence against the scratchpad. Handles validation before execution, reset between runs, and retries on failure. Two implementations are available depending on your performance needs — see Dispatch below.
+**Pipeline**: the executor that runs stages in sequence against the scratchpad. Handles validation before execution and reset between runs. Two implementations are available depending on your performance needs — see Dispatch below.
 
 ```rust
-// Dynamic: flexible, stages can vary at runtime
-let mut pipeline = dynamic_pipeline::Pipeline::new().with_retries(3);
+let mut pipeline = dynamic_pipeline::Pipeline::new();
 pipeline.add_stage(DoubleValues);
 pipeline.run(&mut scratchpad)?;
 ```
@@ -58,12 +57,27 @@ pipeline.run(&mut scratchpad)?;
 
 ```rust
 // Dynamic: flexible, stages can vary at runtime
-let mut pipeline = dynamic_pipeline::Pipeline::new().with_retries(3);
+let mut pipeline = dynamic_pipeline::Pipeline::new();
 pipeline.add_stage(DoubleValues);
 
 // Static: fixed capacity, zero heap allocation
 let mut pipeline = static_pipeline::Pipeline::<MyScratchpad, 4>::new();
 pipeline.add_stage(double_values)?;
+```
+
+---
+
+## Retries
+
+Retry behaviour is opt-in per stage via the `Retry` wrapper. Rather than configuring retries on the pipeline, wrap individual stages that need retry logic. On failure the scratchpad is reset and the stage is retried up to the specified number of times.
+
+```rust
+use pipex::retry::Retry;
+
+let mut pipeline = dynamic_pipeline::Pipeline::new();
+pipeline.add_stage(Retry::new(DoubleValues, 3));  // retries up to 3 times
+pipeline.add_stage(NormaliseValues);               // no retries
+pipeline.run(&mut scratchpad)?;
 ```
 
 ---
@@ -80,7 +94,7 @@ pipeline.add_stage(double_values)?;
 - [ ] SIMD support for numeric data pipelines
 
 **Features**
-- [ ] Retry mechanism as an opt-in wrapper rather than baked into the pipeline
+- [x] Retry mechanism as an opt-in wrapper: implemented as `retry::Retry`
 - [ ] Parallel stage execution
 - [ ] Arena allocation support
 - [ ] Buffer pooling
@@ -99,3 +113,4 @@ pipeline.add_stage(double_values)?;
 - **Modules and `cargo`**: structuring the code as a proper reusable library
 - **Doc comments and doctests**: documentation that is automatically tested by `cargo test`
 - **Pattern matching**: using `match`, `if let`, and `matches!` for expressive control flow
+- **Decorator pattern**: wrapping stages with additional behaviour via `Retry`
