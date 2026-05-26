@@ -21,6 +21,22 @@ pub enum PipelineError {
     RetryExhausted { attempts: u32, reason: String },
 }
 
+impl std::fmt::Display for PipelineError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PipelineError::StageFailed(msg) => write!(f, "stage failed: {}", msg),
+            PipelineError::ValidationFailed(msg) => write!(f, "validation failed: {}", msg),
+            PipelineError::EmptyPipeline => write!(f, "pipeline has no stages"),
+            PipelineError::InvalidState(msg) => write!(f, "invalid state: {}", msg),
+            PipelineError::RetryExhausted { attempts, reason } => {
+                write!(f, "stage failed after {} attempts: {}", attempts, reason)
+            }
+        }
+    }
+}
+
+impl std::error::Error for PipelineError {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

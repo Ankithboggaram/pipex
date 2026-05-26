@@ -30,6 +30,39 @@ pub struct StageSnapshot {
     pub last_updated_ns: u64,
 }
 
+impl std::fmt::Display for StageSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let status = if self.error_count == 0 { "OK" } else { "ERR" };
+        writeln!(f, "[{}] {}", status, self.label)?;
+        writeln!(f, "  Count:              {}", self.count)?;
+        writeln!(f, "  50th Percentile:    {}ns", self.p50_ns)?;
+        writeln!(f, "  95th Percentile:    {}ns", self.p95_ns)?;
+        writeln!(f, "  99th Percentile:    {}ns", self.p99_ns)?;
+        writeln!(f, "  99.9th Percentile:  {}ns", self.p999_ns)?;
+        write!(
+            f,
+            "  Errors:             {} ({:.2}%)",
+            self.error_count,
+            self.error_rate * 100.0
+        )
+    }
+}
+
+impl StageSnapshot {
+    /// Returns a compact single-line summary suitable for multi-stage dashboards.
+    pub fn summary(&self) -> String {
+        let status = if self.error_count == 0 { "OK" } else { "ERR" };
+        format!(
+            "[{}] {:<20}  p99={:<10}  p999={:<10}  errors={}",
+            status,
+            self.label,
+            format!("{}ns", self.p99_ns),
+            format!("{}ns", self.p999_ns),
+            self.error_count,
+        )
+    }
+}
+
 /// Lock-free per-stage metrics collector with rolling window percentiles.
 ///
 /// Uses a fixed-size ring buffer of the last 1024 samples for percentile
