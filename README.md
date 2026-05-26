@@ -37,10 +37,11 @@ impl Stage<MyScratchpad> for DoubleValues {
 }
 ```
 
-**Pipeline**: the executor that runs stages in sequence against the scratchpad. Handles validation before execution, reset between runs, and retries on failure. Two implementations are available depending on your performance needs.
+**Pipeline**: the executor that runs stages in sequence against the scratchpad. Handles validation before execution, reset between runs, and retries on failure. Two implementations are available depending on your performance needs — see Dispatch below.
 
 ```rust
-let mut pipeline = Pipeline::new().with_retries(3);
+// Dynamic: flexible, stages can vary at runtime
+let mut pipeline = dynamic_pipeline::Pipeline::new().with_retries(3);
 pipeline.add_stage(DoubleValues);
 pipeline.run(&mut scratchpad)?;
 ```
@@ -67,6 +68,26 @@ pipeline.add_stage(double_values)?;
 
 ---
 
+## Future Extensions
+
+**Performance**
+- [x] Static dispatch pipeline variant: implemented as `static_pipeline::Pipeline`
+- [x] Remove retry logic from the core execution loop: retries are now zero-cost when set to 0
+- [ ] Type chaining static pipeline for full compiler inlining across stage boundaries
+- [ ] Cache-line alignment hints on scratchpad buffers to reduce CPU cache misses
+- [ ] Zero allocation guarantee post-initialisation, with documentation and tests to enforce it
+- [ ] Benchmarking via `criterion` comparing `pipex` against naive allocation-per-stage pipelines
+- [ ] SIMD support for numeric data pipelines
+
+**Features**
+- [ ] Retry mechanism as an opt-in wrapper rather than baked into the pipeline
+- [ ] Parallel stage execution
+- [ ] Arena allocation support
+- [ ] Buffer pooling
+- [ ] Task graphs
+
+---
+
 ## Concepts Encountered While Implementing
 
 - **Structs and ownership**: defining the scratchpad and understanding who owns the data
@@ -78,25 +99,3 @@ pipeline.add_stage(double_values)?;
 - **Modules and `cargo`**: structuring the code as a proper reusable library
 - **Doc comments and doctests**: documentation that is automatically tested by `cargo test`
 - **Pattern matching**: using `match`, `if let`, and `matches!` for expressive control flow
-
----
-
-## Future Extensions
-
-**Performance**
-- Type chaining static pipeline for full compiler inlining across stage boundaries
-- Cache-line alignment hints on scratchpad buffers to reduce CPU cache misses
-- Zero allocation guarantee post-initialisation, with documentation and tests to enforce it
-- Benchmarking via `criterion` comparing `pipex` against naive allocation-per-stage pipelines
-- SIMD support for numeric data pipelines
-
-**Features**
-- Retry mechanism as an opt-in wrapper rather than baked into the pipeline
-- Parallel stage execution
-- Arena allocation support
-- Buffer pooling
-- Task graphs
-
-**Completed**
-- ~~Static dispatch pipeline variant~~: implemented as `static_pipeline::Pipeline`
-- ~~Remove retry logic from the core execution loop~~: retries are now zero-cost when set to 0
