@@ -79,7 +79,7 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
 
         for i in 0..self.count {
             if let Some(stage) = self.stages[i] {
-                stage(ctx).map_err(|e| PipelineError::StageFailed(format!("{:?}", e)))?;
+                stage(ctx)?;
             }
         }
 

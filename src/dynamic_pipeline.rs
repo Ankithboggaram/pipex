@@ -70,9 +70,7 @@ impl<S: Scratchpad> Pipeline<S> {
         }
 
         for stage in self.stages.iter_mut() {
-            stage
-                .run(ctx)
-                .map_err(|e| PipelineError::StageFailed(format!("{:?}", e)))?;
+            stage.run(ctx)?;
         }
 
         Ok(())

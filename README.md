@@ -170,4 +170,3 @@ Using genuinely different stage types in the same pipeline has no performance pe
 - **Doc comments and doctests**: documentation that is automatically tested by `cargo test`
 - **Pattern matching**: using `match`, `if let`, and `matches!` for expressive control flow
 - **Decorator pattern**: wrapping stages with additional behaviour via `Retry`
-- 
