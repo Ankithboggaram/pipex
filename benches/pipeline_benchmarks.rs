@@ -1,10 +1,13 @@
 use divan::{Bencher, black_box};
 use pipex::dynamic_pipeline::Pipeline as DynamicPipeline;
 use pipex::error::PipelineError;
+use pipex::instrument::Instrumented;
+use pipex::metrics::{StageMetrics, Timed};
 use pipex::retry::Retry;
 use pipex::scratchpad::Scratchpad;
 use pipex::stage::Stage;
 use pipex::static_pipeline::Pipeline as StaticPipeline;
+use std::sync::Arc;
 
 fn main() {
     divan::main();
@@ -307,6 +310,64 @@ mod mixed_stages {
                 _ => pipeline.add_stage(DeltaStage),
             }
         }
+        let mut ctx = BenchScratchpad::new(10_000);
+
+        bencher.bench_local(|| {
+            ctx.reset();
+            pipeline.run(black_box(&mut ctx)).unwrap();
+        });
+    }
+}
+
+mod instrumentation_overhead {
+    use super::*;
+    use stages::*;
+
+    #[divan::bench]
+    fn plain_stage(bencher: Bencher) {
+        let mut pipeline = DynamicPipeline::new();
+        pipeline.add_stage(NormaliseStage);
+        let mut ctx = BenchScratchpad::new(10_000);
+
+        bencher.bench_local(|| {
+            ctx.reset();
+            pipeline.run(black_box(&mut ctx)).unwrap();
+        });
+    }
+
+    #[divan::bench]
+    fn timed_stage(bencher: Bencher) {
+        let metrics = StageMetrics::new("normalise");
+        let mut pipeline = DynamicPipeline::new();
+        pipeline.add_stage(Timed::new(NormaliseStage, Arc::clone(&metrics)));
+        let mut ctx = BenchScratchpad::new(10_000);
+
+        bencher.bench_local(|| {
+            ctx.reset();
+            pipeline.run(black_box(&mut ctx)).unwrap();
+        });
+    }
+
+    #[divan::bench]
+    fn instrumented_stage(bencher: Bencher) {
+        let mut pipeline = DynamicPipeline::new();
+        pipeline.add_stage(Instrumented::new(NormaliseStage, "normalise"));
+        let mut ctx = BenchScratchpad::new(10_000);
+
+        bencher.bench_local(|| {
+            ctx.reset();
+            pipeline.run(black_box(&mut ctx)).unwrap();
+        });
+    }
+
+    #[divan::bench]
+    fn timed_and_instrumented_stage(bencher: Bencher) {
+        let metrics = StageMetrics::new("normalise");
+        let mut pipeline = DynamicPipeline::new();
+        pipeline.add_stage(Timed::new(
+            Instrumented::new(NormaliseStage, "normalise"),
+            Arc::clone(&metrics),
+        ));
         let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {

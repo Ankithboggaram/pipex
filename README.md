@@ -72,6 +72,37 @@ pipeline.add_stage(ClampStage);
 
 ---
 
+## Observability
+
+**Timing metrics** via `Timed` — lock-free per-stage latency tracking with rolling window percentiles. Zero locking, atomic operations only.
+
+```rust
+use pipex::metrics::{StageMetrics, Timed};
+use std::sync::Arc;
+
+let metrics = StageMetrics::new("normalise");
+pipeline.add_stage(Timed::new(NormaliseStage, Arc::clone(&metrics)));
+
+let snapshot = metrics.snapshot();
+println!("p99: {}ns  p999: {}ns  errors: {}", snapshot.p99_ns, snapshot.p999_ns, snapshot.error_count);
+```
+
+**Tracing spans** via `Instrumented` — emits structured spans on every stage execution. Integrates with the `tracing` ecosystem. Zero overhead when no subscriber is configured.
+
+```rust
+use pipex::instrument::Instrumented;
+
+pipeline.add_stage(Instrumented::new(NormaliseStage, "normalise"));
+```
+
+Both wrappers compose cleanly:
+
+```rust
+pipeline.add_stage(Timed::new(Instrumented::new(NormaliseStage, "normalise"), Arc::clone(&metrics)));
+```
+
+---
+
 ## Performance
 
 Measured on Apple Silicon using [divan](https://github.com/nvzqz/divan). Scratchpad pre-allocated outside the measured loop.
@@ -94,7 +125,11 @@ Measured on Apple Silicon using [divan](https://github.com/nvzqz/divan). Scratch
 
 Both pipelines scale linearly. At large data sizes dispatch method is irrelevant — memory bandwidth dominates. Static pipeline advantage is most visible at small data sizes where vtable overhead is proportionally larger.
 
-**Retry overhead**: zero measurable overhead when no retries are triggered. **Mixed stage types**: no performance penalty versus same-type stages.
+**Wrapper overhead**: `Instrumented` is zero-cost when no tracing subscriber is configured. `Timed` adds ~70ns per stage call for atomic writes and clock reads.
+
+**Retry overhead**: zero measurable overhead when no retries are triggered. 
+
+**Mixed stage types**: no performance penalty versus same-type stages.
 
 **Zero allocation guarantee**: verified by test — neither pipeline allocates during `run()` after initialisation.
 
@@ -114,6 +149,8 @@ Both pipelines scale linearly. At large data sizes dispatch method is irrelevant
 
 **Features**
 - [x] Per-stage retry via `retry::Retry`
+- [x] Per-stage timing metrics via `metrics::Timed`
+- [x] Per-stage tracing spans via `instrument::Instrumented`
 - [ ] Parallel stage execution
 - [ ] Arena allocation
 - [ ] Buffer pooling
