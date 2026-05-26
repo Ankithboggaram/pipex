@@ -1,4 +1,4 @@
-# pipex — A Generic Pipeline Execution Library in Rust
+# pipex: A Generic Pipeline Execution Library in Rust
 
 ## About This Project
 
@@ -6,33 +6,11 @@ A personal utility library built while learning Rust. The intent is not publicat
 
 ---
 
-## What is a Scratchpad?
-
-A scratchpad is a single, reusable memory structure shared across multiple stages of a computation pipeline. Rather than allocating fresh data structures at each stage, the same buffers are read from and written to throughout execution. This reduces heap pressure, improves cache locality, and produces more predictable runtime performance.
-
-It is a common pattern in game engines, compilers, ML inference runtimes, and signal processing systems — anywhere a fixed pipeline runs repeatedly at high frequency.
-
----
-
-## The Problem With Naive Pipelines
-
-A straightforward pipeline implementation allocates at every step:
-
-```rust
-fn stage1() -> Vec<f32> { ... }
-fn stage2(input: Vec<f32>) -> Vec<f32> { ... }
-fn stage3(input: Vec<f32>) -> Vec<f32> { ... }
-```
-
-This produces repeated heap allocations, unnecessary copies, and allocator overhead — costs that compound quickly in real-time or high-throughput contexts.
-
----
-
 ## Core Architecture
 
 `pipex` is built around three concepts:
 
-**Scratchpad** — a trait you implement on your own struct. Defines `reset()` and `validate()`, called by the pipeline at the right moments. Your struct holds whatever buffers your application needs.
+**Scratchpad**: a reusable memory buffer passed through every stage of the pipeline. Rather than allocating fresh data at each step, the same struct is read from and written to throughout execution. Define your own fields to match your application's needs.
 
 ```rust
 struct MyScratchpad {
@@ -46,7 +24,7 @@ impl Scratchpad for MyScratchpad {
 }
 ```
 
-**Stage** — a trait you implement for each computation step. Receives a mutable reference to the scratchpad, reads what it needs, and writes its output back in place.
+**Stage**: a single computation step that operates on the scratchpad. Each stage receives a mutable reference, reads what it needs, and writes its output back in place. Stages are composable and independent of each other.
 
 ```rust
 struct DoubleValues;
@@ -59,7 +37,7 @@ impl Stage<MyScratchpad> for DoubleValues {
 }
 ```
 
-**Pipeline** — holds a sequence of stages and runs them in order against the scratchpad. Handles validation, reset between runs, and retries on failure.
+**Pipeline**: the executor that runs stages in sequence against the scratchpad. Handles validation before execution, reset between runs, and retries on failure. Two implementations are available depending on your performance needs.
 
 ```rust
 let mut pipeline = Pipeline::new().with_retries(3);
@@ -71,40 +49,54 @@ pipeline.run(&mut scratchpad)?;
 
 ## Dispatch
 
-`pipex` uses dynamic dispatch to store stages in the pipeline:
+`pipex` ships two pipeline implementations:
+
+**`dynamic_pipeline::Pipeline`**: uses `Box<dyn Stage<S>>` for runtime flexibility. Different stage types can be mixed in the same pipeline and stages can be added based on runtime conditions. Has a small vtable lookup overhead on each stage call. Best suited for coarse-grained pipelines where each stage does meaningful work.
+
+**`static_pipeline::Pipeline`**: uses fixed-size arrays of function pointers. No heap allocation after initialisation, no vtable overhead, direct function calls. The pipeline capacity `N` must be known at compile time. Best suited for fixed, performance-critical pipelines.
 
 ```rust
-stages: Vec<Box<dyn Stage<S>>>
+// Dynamic: flexible, stages can vary at runtime
+let mut pipeline = dynamic_pipeline::Pipeline::new().with_retries(3);
+pipeline.add_stage(DoubleValues);
+
+// Static: fixed capacity, zero heap allocation
+let mut pipeline = static_pipeline::Pipeline::<MyScratchpad, 4>::new();
+pipeline.add_stage(double_values)?;
 ```
-
-This allows the pipeline to hold stages of different types in the same collection at runtime. The tradeoff is a small overhead from vtable lookups on each stage call, which is acceptable for a pipeline execution library where flexibility is more important than micro-optimising individual calls.
-
-For the same reason, avoid using `pipex` in tight inner loops where every nanosecond counts. It is best suited for coarse-grained pipelines where each stage does a meaningful amount of work.
 
 ---
 
 ## Concepts Encountered While Implementing
 
-- **Structs and ownership** — defining the scratchpad and understanding who owns the data
-- **Traits** — defining the `Stage` interface in a pluggable, modular way
-- **Lifetimes** — passing references through pipeline stages without unnecessary copies
-- **Generics** — making stages work across different scratchpad types
-- **`Result` and error handling** — deciding what happens when a stage fails
-- **Modules and `cargo`** — structuring the code as a proper reusable library
+- **Structs and ownership**: defining the scratchpad and understanding who owns the data
+- **Traits**: defining the `Stage` interface in a pluggable, modular way
+- **Lifetimes**: passing references through pipeline stages without unnecessary copies
+- **Generics and const generics**: making stages and pipelines work across different types and fixed capacities
+- **`Result` and error handling**: deciding what happens when a stage fails
+- **Dynamic vs static dispatch**: tradeoffs between `Box<dyn Trait>` and function pointers
+- **Modules and `cargo`**: structuring the code as a proper reusable library
+- **Doc comments and doctests**: documentation that is automatically tested by `cargo test`
+- **Pattern matching**: using `match`, `if let`, and `matches!` for expressive control flow
 
 ---
 
 ## Future Extensions
 
 **Performance**
-- Static dispatch pipeline variant to eliminate vtable overhead and enable compiler inlining
-- Remove retry logic from the core execution loop — retries should be an opt-in wrapper, not baked into the hot path
+- Type chaining static pipeline for full compiler inlining across stage boundaries
 - Cache-line alignment hints on scratchpad buffers to reduce CPU cache misses
 - Zero allocation guarantee post-initialisation, with documentation and tests to enforce it
 - Benchmarking via `criterion` comparing `pipex` against naive allocation-per-stage pipelines
+- SIMD support for numeric data pipelines
 
 **Features**
+- Retry mechanism as an opt-in wrapper rather than baked into the pipeline
 - Parallel stage execution
 - Arena allocation support
 - Buffer pooling
 - Task graphs
+
+**Completed**
+- ~~Static dispatch pipeline variant~~: implemented as `static_pipeline::Pipeline`
+- ~~Remove retry logic from the core execution loop~~: retries are now zero-cost when set to 0

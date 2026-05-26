@@ -1,14 +1,18 @@
-//! Pipeline executor that runs stages against a scratchpad.
+//! Dynamic pipeline executor using boxed trait objects for runtime flexibility.
 
 use crate::error::PipelineError;
 use crate::scratchpad::Scratchpad;
 use crate::stage::Stage;
 
-/// A pipeline that runs a sequence of stages against a scratchpad.
+/// A pipeline that stores stages as boxed trait objects, allowing different
+/// stage types to be mixed at runtime.
+///
+/// Uses dynamic dispatch via `Box<dyn Stage<S>>`. For a zero heap allocation
+/// alternative with stages known at compile time, see `StaticPipeline`.
 ///
 /// # Example
 /// ```
-/// use pipex::pipeline::Pipeline;
+/// use pipex::dynamic_pipeline::Pipeline;
 /// use pipex::scratchpad::Scratchpad;
 ///
 /// struct MyScratchpad;
