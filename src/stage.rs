@@ -25,7 +25,9 @@ use crate::scratchpad::Scratchpad;
 pub trait Stage<S: Scratchpad> {
     /// Executes this stage against the provided scratchpad.
     ///
-    /// Returns `Ok(())` on success, or a `PipelineError` on failure.
+    /// # Errors
+    ///
+    /// Returns a `PipelineError` if the stage fails during execution.
     fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError>;
 }
 

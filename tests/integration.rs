@@ -37,7 +37,7 @@ struct NormaliseStage;
 
 impl Stage<MlScratchpad> for NormaliseStage {
     fn run(&mut self, ctx: &mut MlScratchpad) -> Result<(), PipelineError> {
-        let max = ctx.raw.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let max = ctx.raw.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         if max == 0.0 {
             return Err(PipelineError::StageFailed(String::from(
                 "cannot normalise: max value is zero",
@@ -74,7 +74,7 @@ impl Stage<MlScratchpad> for AlwaysFailStage {
 }
 
 fn normalise(ctx: &mut MlScratchpad) -> Result<(), PipelineError> {
-    let max = ctx.raw.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let max = ctx.raw.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     if max == 0.0 {
         return Err(PipelineError::StageFailed(String::from(
             "cannot normalise: max value is zero",
@@ -242,7 +242,6 @@ mod retry_tests {
 
         let mut ctx = MlScratchpad::new(vec![1.0, 2.0]);
         let result = pipeline.run(&mut ctx);
-        println!("{:?}", result);
         assert!(matches!(result, Err(PipelineError::RetryExhausted { .. })));
     }
 

@@ -31,6 +31,7 @@ type StageFn<S> = fn(&mut S) -> Result<(), PipelineError>;
 /// let mut pipeline = Pipeline::<MyScratchpad, 1>::new();
 /// pipeline.add_stage(double);
 /// ```
+#[derive(Debug)]
 pub struct Pipeline<S: Scratchpad, const N: usize> {
     stages: [Option<StageFn<S>>; N],
     count: usize,
@@ -39,6 +40,7 @@ pub struct Pipeline<S: Scratchpad, const N: usize> {
 
 impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
     /// Creates a new empty static pipeline with capacity for `N` stages.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             stages: [None; N],
@@ -49,7 +51,9 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
 
     /// Adds a stage function to the pipeline.
     ///
-    /// Returns an error if the pipeline is already at capacity.
+    /// # Errors
+    ///
+    /// Returns `PipelineError::StageFailed` if the pipeline is already at capacity.
     pub fn add_stage(&mut self, stage: StageFn<S>) -> Result<(), PipelineError> {
         if self.count >= N {
             return Err(PipelineError::StageFailed(String::from(
@@ -62,6 +66,12 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
     }
 
     /// Runs all stages in order against the provided scratchpad.
+    ///
+    /// # Errors
+    ///
+    /// Returns `PipelineError::EmptyPipeline` if no stages have been added,
+    /// `PipelineError::ValidationFailed` if the scratchpad fails validation,
+    /// or the error from the first stage that fails.
     #[inline]
     pub fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
         if self.count == 0 {

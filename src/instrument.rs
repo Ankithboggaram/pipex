@@ -37,6 +37,7 @@ use crate::stage::Stage;
 /// let mut pipeline = Pipeline::new();
 /// pipeline.add_stage(Instrumented::new(MyStage, "my_stage"));
 /// ```
+#[derive(Debug)]
 pub struct Instrumented<S: Scratchpad, T: Stage<S>> {
     stage: T,
     name: &'static str,
@@ -46,7 +47,8 @@ pub struct Instrumented<S: Scratchpad, T: Stage<S>> {
 impl<S: Scratchpad, T: Stage<S>> Instrumented<S, T> {
     /// Creates a new `Instrumented` wrapper around a stage.
     ///
-    /// `name` must be a static string literal known at compile time.
+    /// The `name` parameter must be a `&'static str` known at compile time.
+    #[must_use]
     pub fn new(stage: T, name: &'static str) -> Self {
         Self {
             stage,

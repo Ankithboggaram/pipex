@@ -50,6 +50,7 @@ impl std::fmt::Display for StageSnapshot {
 
 impl StageSnapshot {
     /// Returns a compact single-line summary suitable for multi-stage dashboards.
+    #[must_use]
     pub fn summary(&self) -> String {
         let status = if self.error_count == 0 { "OK" } else { "ERR" };
         format!(
@@ -67,6 +68,7 @@ impl StageSnapshot {
 ///
 /// Uses a fixed-size ring buffer of the last 1024 samples for percentile
 /// computation. All counters use atomic operations with no locking.
+#[derive(Debug)]
 pub struct StageMetrics {
     /// Stage label for identification.
     pub label: String,
@@ -83,6 +85,7 @@ pub struct StageMetrics {
 
 impl StageMetrics {
     /// Creates a new `StageMetrics` for the given label.
+    #[must_use]
     pub fn new(label: impl Into<String>) -> Arc<Self> {
         Arc::new(Self {
             label: label.into(),
@@ -120,6 +123,7 @@ impl StageMetrics {
     }
 
     /// Returns a point-in-time snapshot of all current metrics.
+    #[must_use]
     pub fn snapshot(&self) -> StageSnapshot {
         let count = self.count.load(Ordering::Relaxed);
         let error_count = self.error_count.load(Ordering::Relaxed);
@@ -200,6 +204,7 @@ impl StageMetrics {
 /// let mut pipeline = Pipeline::new();
 /// pipeline.add_stage(Timed::new(MyStage, Arc::clone(&metrics)));
 /// ```
+#[derive(Debug)]
 pub struct Timed<S: Scratchpad, T: Stage<S>> {
     stage: T,
     metrics: Arc<StageMetrics>,
@@ -208,6 +213,7 @@ pub struct Timed<S: Scratchpad, T: Stage<S>> {
 
 impl<S: Scratchpad, T: Stage<S>> Timed<S, T> {
     /// Creates a new `Timed` wrapper around a stage.
+    #[must_use]
     pub fn new(stage: T, metrics: Arc<StageMetrics>) -> Self {
         Self {
             stage,

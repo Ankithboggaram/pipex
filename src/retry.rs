@@ -36,6 +36,7 @@ use crate::stage::Stage;
 /// let mut pipeline = Pipeline::new();
 /// pipeline.add_stage(Retry::new(DoubleValues, 3));
 /// ```
+#[derive(Debug)]
 pub struct Retry<S: Scratchpad, T: Stage<S>> {
     stage: T,
     retries: u32,
@@ -44,6 +45,7 @@ pub struct Retry<S: Scratchpad, T: Stage<S>> {
 
 impl<S: Scratchpad, T: Stage<S>> Retry<S, T> {
     /// Creates a new `Retry` wrapper around a stage with a given retry count.
+    #[must_use]
     pub fn new(stage: T, retries: u32) -> Self {
         Self {
             stage,
@@ -72,7 +74,10 @@ impl<S: Scratchpad, T: Stage<S>> Stage<S> for Retry<S, T> {
 
         Err(PipelineError::RetryExhausted {
             attempts: self.retries + 1,
-            reason: format!("{:?}", last_error.unwrap()),
+            reason: format!(
+                "{:?}",
+                last_error.expect("last_error is Some after at least one loop iteration")
+            ),
         })
     }
 }

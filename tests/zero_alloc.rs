@@ -79,10 +79,6 @@ mod zero_alloc_tests {
             values: vec![1.0, 2.0, 3.0],
         };
 
-        // warm up — first run triggers validation flag write
-        pipeline.run(&mut ctx).unwrap();
-
-        // reset counter and measure only subsequent runs
         ALLOCATOR.reset();
         pipeline.run(&mut ctx).unwrap();
 
@@ -100,8 +96,6 @@ mod zero_alloc_tests {
         let mut ctx = ZeroAllocScratchpad {
             values: vec![1.0, 2.0, 3.0],
         };
-
-        pipeline.run(&mut ctx).unwrap();
 
         ALLOCATOR.reset();
         pipeline.run(&mut ctx).unwrap();

@@ -2,6 +2,7 @@
 
 /// Represents errors that can occur during pipeline execution.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum PipelineError {
     /// A stage failed during execution, with a descriptive message.
     StageFailed(String),
@@ -24,12 +25,12 @@ pub enum PipelineError {
 impl std::fmt::Display for PipelineError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PipelineError::StageFailed(msg) => write!(f, "stage failed: {}", msg),
-            PipelineError::ValidationFailed(msg) => write!(f, "validation failed: {}", msg),
+            PipelineError::StageFailed(msg) => write!(f, "stage failed: {msg}"),
+            PipelineError::ValidationFailed(msg) => write!(f, "validation failed: {msg}"),
             PipelineError::EmptyPipeline => write!(f, "pipeline has no stages"),
-            PipelineError::InvalidState(msg) => write!(f, "invalid state: {}", msg),
+            PipelineError::InvalidState(msg) => write!(f, "invalid state: {msg}"),
             PipelineError::RetryExhausted { attempts, reason } => {
-                write!(f, "stage failed after {} attempts: {}", attempts, reason)
+                write!(f, "stage failed after {attempts} attempts: {reason}")
             }
         }
     }
@@ -44,19 +45,19 @@ mod tests {
     #[test]
     fn stage_failed_contains_message() {
         let error = PipelineError::StageFailed(String::from("something went wrong"));
-        assert!(format!("{:?}", error).contains("something went wrong"));
+        assert!(format!("{error:?}").contains("something went wrong"));
     }
 
     #[test]
     fn validation_failed_contains_message() {
         let error = PipelineError::ValidationFailed(String::from("invalid state"));
-        assert!(format!("{:?}", error).contains("invalid state"));
+        assert!(format!("{error:?}").contains("invalid state"));
     }
 
     #[test]
     fn empty_pipeline_is_debug_printable() {
         let error = PipelineError::EmptyPipeline;
-        assert!(format!("{:?}", error).contains("EmptyPipeline"));
+        assert!(format!("{error:?}").contains("EmptyPipeline"));
     }
 
     #[test]
@@ -65,8 +66,8 @@ mod tests {
             attempts: 3,
             reason: String::from("timed out"),
         };
-        let debug = format!("{:?}", error);
-        assert!(debug.contains("3"));
+        let debug = format!("{error:?}");
+        assert!(debug.contains('3'));
         assert!(debug.contains("timed out"));
     }
 }

@@ -47,7 +47,7 @@ mod stages {
     pub struct NormaliseStage;
     impl Stage<BenchScratchpad> for NormaliseStage {
         fn run(&mut self, ctx: &mut BenchScratchpad) -> Result<(), PipelineError> {
-            let max = ctx.input.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+            let max = ctx.input.iter().copied().fold(f32::NEG_INFINITY, f32::max);
             if max == 0.0 {
                 return Ok(());
             }
@@ -95,7 +95,7 @@ mod stages {
     }
 
     pub fn normalise(ctx: &mut BenchScratchpad) -> Result<(), PipelineError> {
-        let max = ctx.input.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let max = ctx.input.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         if max == 0.0 {
             return Ok(());
         }
@@ -130,7 +130,7 @@ mod stages {
     }
 
     pub fn naive_pipeline(data: &[f32]) -> Vec<f32> {
-        let max = data.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let max = data.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         let normalised: Vec<f32> = data.iter().map(|x| x / max).collect();
         let clamped: Vec<f32> = normalised.iter().map(|x| x.clamp(0.1, 0.9)).collect();
         clamped.iter().map(|x| x * 2.0).collect()

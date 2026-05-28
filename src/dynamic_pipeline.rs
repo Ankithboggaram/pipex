@@ -25,9 +25,18 @@ use crate::stage::Stage;
 /// let pipeline: Pipeline<MyScratchpad> = Pipeline::new();
 /// ```
 pub struct Pipeline<S: Scratchpad> {
-    /// The sequence of stages to execute.
+    // The sequence of stages to execute.
     stages: Vec<Box<dyn Stage<S>>>,
     validated: bool,
+}
+
+impl<S: Scratchpad> std::fmt::Debug for Pipeline<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Pipeline")
+            .field("stages", &self.stages.len())
+            .field("validated", &self.validated)
+            .finish()
+    }
 }
 
 impl<S: Scratchpad> Default for Pipeline<S> {
@@ -37,7 +46,8 @@ impl<S: Scratchpad> Default for Pipeline<S> {
 }
 
 impl<S: Scratchpad> Pipeline<S> {
-    /// Creates a new empty pipeline with no retries.
+    /// Creates a new empty pipeline.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             stages: Vec::new(),
@@ -62,6 +72,12 @@ impl<S: Scratchpad> Pipeline<S> {
     ///
     /// Validates the scratchpad before execution, and resets it
     /// between pipeline runs.
+    ///
+    /// # Errors
+    ///
+    /// Returns `PipelineError::EmptyPipeline` if no stages have been added,
+    /// `PipelineError::ValidationFailed` if the scratchpad fails validation,
+    /// or the error from the first stage that fails.
     #[inline]
     pub fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
         if self.stages.is_empty() {
@@ -77,7 +93,7 @@ impl<S: Scratchpad> Pipeline<S> {
             self.validated = true;
         }
 
-        for stage in self.stages.iter_mut() {
+        for stage in &mut self.stages {
             stage.run(ctx)?;
         }
 
