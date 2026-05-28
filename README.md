@@ -4,9 +4,18 @@ A high-performance, zero-allocation pipeline execution library for Rust. Stages 
 
 ---
 
-## Usage
+## Add to your project
 
-Define a scratchpad, implement stages, build a pipeline:
+```toml
+[dependencies]
+pipex = { git = "https://github.com/Ankithboggaram/pipex" }
+```
+
+---
+
+## Quick start
+
+Three steps: define a scratchpad, implement your stages, run the pipeline.
 
 ```rust
 use pipex::scratchpad::Scratchpad;
@@ -14,6 +23,7 @@ use pipex::stage::Stage;
 use pipex::dynamic_pipeline::Pipeline;
 use pipex::error::PipelineError;
 
+// 1. Define your scratchpad — the shared buffer stages read from and write to.
 struct MyScratchpad {
     input: Vec<f32>,
     output: Vec<f32>,
@@ -24,6 +34,7 @@ impl Scratchpad for MyScratchpad {
     fn validate(&self) -> bool { !self.input.is_empty() }
 }
 
+// 2. Implement your stages.
 struct NormaliseStage;
 
 impl Stage<MyScratchpad> for NormaliseStage {
@@ -34,6 +45,7 @@ impl Stage<MyScratchpad> for NormaliseStage {
     }
 }
 
+// 3. Build and run.
 let mut pipeline = Pipeline::new();
 pipeline.add_stage(NormaliseStage);
 
@@ -43,40 +55,45 @@ pipeline.run(&mut ctx).unwrap();
 
 ---
 
-## Pipelines
+## Choosing a pipeline type
 
-**`dynamic_pipeline::Pipeline`**: stores stages as `Box<dyn Stage<S>>`. Supports mixed stage types and runtime configuration. Small vtable overhead per stage call.
-
-**`static_pipeline::Pipeline`**: stores stages as fixed-size arrays of function pointers. Zero heap allocation after initialisation, no vtable overhead. Capacity `N` fixed at compile time.
+**Dynamic** — use when stage types differ or the pipeline is configured at runtime.
 
 ```rust
-// Dynamic
-let mut pipeline = dynamic_pipeline::Pipeline::new();
-pipeline.add_stage(NormaliseStage);
+use pipex::dynamic_pipeline::Pipeline;
 
-// Static
-let mut pipeline = static_pipeline::Pipeline::<MyScratchpad, 4>::new();
-pipeline.add_stage(normalise_fn)?;
+let mut pipeline = Pipeline::new();
+pipeline.add_stage(NormaliseStage);
+pipeline.add_stage(ClampStage);
+```
+
+**Static** — use when all stages are known at compile time. Zero heap allocation after setup, no vtable overhead. Capacity is fixed at `N`.
+
+```rust
+use pipex::static_pipeline::Pipeline;
+
+let mut pipeline = Pipeline::<MyScratchpad, 2>::new();
+pipeline.add_stage(normalise)?;
+pipeline.add_stage(clamp)?;
 ```
 
 ---
 
-## Retries
+## Retry
 
-Per-stage retry logic via the `Retry` wrapper. The scratchpad is reset between attempts.
+Wrap any stage in `Retry` to re-run it on failure. The scratchpad is reset between attempts.
 
 ```rust
 use pipex::retry::Retry;
 
-pipeline.add_stage(Retry::new(NormaliseStage, 3));
-pipeline.add_stage(ClampStage);
+pipeline.add_stage(Retry::new(NormaliseStage, 3)); // up to 3 retries
 ```
 
 ---
 
-## Observability
+## Metrics
 
-**Timing metrics** via `Timed` — lock-free per-stage latency tracking with rolling window percentiles. Zero locking, atomic operations only.
+Wrap any stage in `Timed` to collect per-stage execution latency. Metrics are lock-free and include rolling window percentiles (p50, p95, p99, p99.9).
 
 ```rust
 use pipex::metrics::{StageMetrics, Timed};
@@ -89,7 +106,11 @@ let snapshot = metrics.snapshot();
 println!("p99: {}ns  p999: {}ns  errors: {}", snapshot.p99_ns, snapshot.p999_ns, snapshot.error_count);
 ```
 
-**Tracing spans** via `Instrumented` — emits structured spans on every stage execution. Integrates with the `tracing` ecosystem. Zero overhead when no subscriber is configured.
+---
+
+## Tracing
+
+Wrap any stage in `Instrumented` to emit a [`tracing`](https://docs.rs/tracing) span on every execution.
 
 ```rust
 use pipex::instrument::Instrumented;
@@ -97,7 +118,11 @@ use pipex::instrument::Instrumented;
 pipeline.add_stage(Instrumented::new(NormaliseStage, "normalise"));
 ```
 
-Both wrappers compose cleanly:
+---
+
+## Composing wrappers
+
+All wrappers compose cleanly.
 
 ```rust
 pipeline.add_stage(Timed::new(Instrumented::new(NormaliseStage, "normalise"), Arc::clone(&metrics)));
@@ -129,11 +154,11 @@ Both pipelines scale linearly. At large data sizes dispatch method is irrelevant
 
 **Wrapper overhead**: `Instrumented` is zero-cost when no tracing subscriber is configured. `Timed` adds ~70ns per stage call for atomic writes and clock reads.
 
-**Retry overhead**: zero measurable overhead when no retries are triggered. 
+**Retry overhead**: zero measurable overhead when no retries are triggered.
 
 **Mixed stage types**: no performance penalty versus same-type stages.
 
-**Zero allocation guarantee**: verified by test — neither pipeline allocates during `run()` after initialisation.
+**Zero allocation guarantee**: verified by test — neither pipeline allocates during `run()` on the success path.
 
 ---
 
