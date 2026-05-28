@@ -1,6 +1,6 @@
 # pipex
 
-A generic, allocation-aware pipeline execution library for Rust. Stages operate on a shared scratchpad buffer rather than allocating intermediate data structures, producing predictable latency suitable for ML inference, signal processing, and real-time computation.
+A high-performance, zero-allocation pipeline execution library for Rust. Stages operate on a shared pre-allocated scratchpad buffer, reading inputs and writing outputs in place. No heap allocation occurs on the execution hot path.
 
 ---
 
@@ -28,7 +28,7 @@ struct NormaliseStage;
 
 impl Stage<MyScratchpad> for NormaliseStage {
     fn run(&mut self, ctx: &mut MyScratchpad) -> Result<(), PipelineError> {
-        let max = ctx.input.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let max = ctx.input.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         ctx.output.iter_mut().zip(ctx.input.iter()).for_each(|(o, i)| *o = i / max);
         Ok(())
     }
@@ -36,7 +36,9 @@ impl Stage<MyScratchpad> for NormaliseStage {
 
 let mut pipeline = Pipeline::new();
 pipeline.add_stage(NormaliseStage);
-pipeline.run(&mut scratchpad)?;
+
+let mut ctx = MyScratchpad { input: vec![1.0, 2.0, 4.0], output: vec![0.0; 3] };
+pipeline.run(&mut ctx).unwrap();
 ```
 
 ---
