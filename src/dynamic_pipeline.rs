@@ -50,6 +50,14 @@ impl<S: Scratchpad> Pipeline<S> {
         self.stages.push(Box::new(stage));
     }
 
+    /// Adds a pre-boxed stage directly, avoiding a double-box allocation.
+    ///
+    /// Intended for downstream wiring code that builds wrapped stages
+    /// incrementally before handing them to the pipeline.
+    pub fn push_boxed(&mut self, stage: Box<dyn Stage<S>>) {
+        self.stages.push(stage);
+    }
+
     /// Runs all stages in order against the provided scratchpad.
     ///
     /// Validates the scratchpad before execution, and resets it

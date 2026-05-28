@@ -28,3 +28,13 @@ pub trait Stage<S: Scratchpad> {
     /// Returns `Ok(())` on success, or a `PipelineError` on failure.
     fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError>;
 }
+
+// Provided for downstream wiring code that builds stages incrementally at
+// runtime — allows a boxed stage to be passed into Timed, Instrumented, or
+// Retry without knowing the concrete type at compile time.
+impl<S: Scratchpad> Stage<S> for Box<dyn Stage<S>> {
+    #[inline]
+    fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
+        (**self).run(ctx)
+    }
+}
