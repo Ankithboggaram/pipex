@@ -22,7 +22,7 @@ use crate::scratchpad::Scratchpad;
 ///     }
 /// }
 /// ```
-pub trait Stage<S: Scratchpad> {
+pub trait Stage<S: Scratchpad>: Send {
     /// Executes this stage against the provided scratchpad.
     ///
     /// # Errors

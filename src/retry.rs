@@ -55,7 +55,7 @@ impl<S: Scratchpad, T: Stage<S>> Retry<S, T> {
     }
 }
 
-impl<S: Scratchpad, T: Stage<S>> Stage<S> for Retry<S, T> {
+impl<S: Scratchpad + Send, T: Stage<S>> Stage<S> for Retry<S, T> {
     #[inline]
     fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
         let mut last_error = None;

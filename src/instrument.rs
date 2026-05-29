@@ -58,7 +58,7 @@ impl<S: Scratchpad, T: Stage<S>> Instrumented<S, T> {
     }
 }
 
-impl<S: Scratchpad, T: Stage<S>> Stage<S> for Instrumented<S, T> {
+impl<S: Scratchpad + Send, T: Stage<S>> Stage<S> for Instrumented<S, T> {
     #[inline]
     fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
         let span = tracing::info_span!("stage", name = self.name);
