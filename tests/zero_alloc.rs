@@ -4,7 +4,12 @@ use pipex::scratchpad::Scratchpad;
 use pipex::stage::Stage;
 use pipex::static_pipeline::Pipeline as StaticPipeline;
 use std::alloc::{GlobalAlloc, Layout, System};
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+// Tests share a global allocator, serialize them so one test's setup
+// allocations do not bleed into another test's measurement window.
+static LOCK: Mutex<()> = Mutex::new(());
 
 struct TrackingAllocator {
     allocations: AtomicUsize,
@@ -73,6 +78,7 @@ mod zero_alloc_tests {
 
     #[test]
     fn dynamic_pipeline_does_not_allocate_during_run() {
+        let _guard = LOCK.lock().unwrap();
         let mut pipeline = DynamicPipeline::new(ZeroAllocScratchpad {
             values: vec![1.0, 2.0, 3.0],
         })
@@ -90,6 +96,7 @@ mod zero_alloc_tests {
 
     #[test]
     fn static_pipeline_does_not_allocate_during_run() {
+        let _guard = LOCK.lock().unwrap();
         let mut pipeline = StaticPipeline::<ZeroAllocScratchpad, 1>::new(ZeroAllocScratchpad {
             values: vec![1.0, 2.0, 3.0],
         });

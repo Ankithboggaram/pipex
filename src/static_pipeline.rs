@@ -83,6 +83,41 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
         Ok(())
     }
 
+    /// Returns `true` if the pipeline contains the given stage function.
+    #[must_use]
+    pub fn contains_stage_fn(&self, stage: StageFn<S>) -> bool {
+        self.stages[..self.count]
+            .iter()
+            .any(|s| s.is_some_and(|f| std::ptr::fn_addr_eq(f, stage)))
+    }
+
+    /// Returns the index of the first occurrence of the given stage function,
+    /// or `None` if not present.
+    #[must_use]
+    pub fn stage_fn_position(&self, stage: StageFn<S>) -> Option<usize> {
+        self.stages[..self.count]
+            .iter()
+            .position(|s| s.is_some_and(|f| std::ptr::fn_addr_eq(f, stage)))
+    }
+
+    /// Validates the pipeline's stage configuration with a user-provided closure.
+    ///
+    /// Receives the ordered slice of stage function pointers.
+    ///
+    /// # Errors
+    ///
+    /// Returns whatever error the closure returns.
+    pub fn check<F>(&self, validator: F) -> Result<(), PipelineError>
+    where
+        F: FnOnce(&[StageFn<S>]) -> Result<(), PipelineError>,
+    {
+        let fns: Vec<StageFn<S>> = self.stages[..self.count]
+            .iter()
+            .filter_map(|s| *s)
+            .collect();
+        validator(&fns)
+    }
+
     /// Returns a reference to the pipeline's scratchpad.
     #[must_use]
     pub fn context(&self) -> &S {
@@ -217,5 +252,45 @@ mod tests {
         let mut pipeline = Pipeline::<TestScratchpad, 1>::new(TestScratchpad::new(1.0));
         pipeline.add_stage(failing).unwrap();
         assert!(matches!(pipeline.run(), Err(PipelineError::StageFailed(_))));
+    }
+
+    #[test]
+    fn contains_stage_fn_detects_added_function() {
+        let mut pipeline = Pipeline::<TestScratchpad, 2>::new(TestScratchpad::new(1.0));
+        pipeline.add_stage(double).unwrap();
+        assert!(pipeline.contains_stage_fn(double));
+        assert!(!pipeline.contains_stage_fn(failing));
+    }
+
+    #[test]
+    fn stage_fn_position_returns_correct_index() {
+        let mut pipeline = Pipeline::<TestScratchpad, 2>::new(TestScratchpad::new(1.0));
+        pipeline.add_stage(double).unwrap();
+        pipeline.add_stage(failing).unwrap();
+        assert_eq!(pipeline.stage_fn_position(double), Some(0));
+        assert_eq!(pipeline.stage_fn_position(failing), Some(1));
+    }
+
+    #[test]
+    fn check_validates_stage_ordering() {
+        let mut pipeline = Pipeline::<TestScratchpad, 2>::new(TestScratchpad::new(1.0));
+        pipeline.add_stage(double).unwrap();
+        pipeline.add_stage(failing).unwrap();
+        assert!(
+            pipeline
+                .check(|fns| {
+                    let double_pos = fns
+                        .iter()
+                        .position(|f| std::ptr::fn_addr_eq(*f, double as StageFn<TestScratchpad>));
+                    let fail_pos = fns
+                        .iter()
+                        .position(|f| std::ptr::fn_addr_eq(*f, failing as StageFn<TestScratchpad>));
+                    match (double_pos, fail_pos) {
+                        (Some(d), Some(f)) if d < f => Ok(()),
+                        _ => Err(PipelineError::InvalidState("wrong order".into())),
+                    }
+                })
+                .is_ok()
+        );
     }
 }
