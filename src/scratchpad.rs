@@ -4,6 +4,16 @@
 ///
 /// Implement this on your own struct to use it with `pipex`.
 ///
+/// For best performance on hot paths, consider aligning your scratchpad
+/// to a cache line boundary to avoid false sharing:
+///
+/// ```
+/// #[repr(align(64))]
+/// struct MyScratchpad {
+///     values: Vec<f32>,
+/// }
+/// ```
+///
 /// # Example
 /// ```
 /// struct MyScratchpad {

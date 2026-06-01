@@ -170,7 +170,7 @@ Both pipelines scale linearly. At large data sizes dispatch method is irrelevant
 - [x] Inline hints on hot path methods
 - [x] Skip validation after first successful run
 - [x] Zero allocation guarantee: verified by automated test
-- [ ] Cache-line alignment hints on scratchpad buffers
+- [x] Cache-line alignment hints on scratchpad buffers
 - [ ] Type chaining for full compiler inlining across stage boundaries
 - [ ] SIMD support for numeric pipelines
 

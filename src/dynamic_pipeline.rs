@@ -81,14 +81,12 @@ impl<S: Scratchpad> Pipeline<S> {
     #[inline]
     pub fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
         if self.stages.is_empty() {
-            return Err(PipelineError::EmptyPipeline);
+            return Err(empty_pipeline());
         }
 
         if !self.validated {
             if !ctx.validate() {
-                return Err(PipelineError::ValidationFailed(String::from(
-                    "scratchpad failed validation before pipeline execution",
-                )));
+                return Err(validation_failed());
             }
             self.validated = true;
         }
@@ -99,6 +97,20 @@ impl<S: Scratchpad> Pipeline<S> {
 
         Ok(())
     }
+}
+
+#[cold]
+#[inline(never)]
+fn empty_pipeline() -> PipelineError {
+    PipelineError::EmptyPipeline
+}
+
+#[cold]
+#[inline(never)]
+fn validation_failed() -> PipelineError {
+    PipelineError::ValidationFailed(String::from(
+        "scratchpad failed validation before pipeline execution",
+    ))
 }
 
 #[cfg(test)]

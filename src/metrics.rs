@@ -68,7 +68,11 @@ impl StageSnapshot {
 ///
 /// Uses a fixed-size ring buffer of the last 1024 samples for percentile
 /// computation. All counters use atomic operations with no locking.
+///
+/// Aligned to 64 bytes (one cache line) to prevent false sharing when
+/// multiple stages each hold their own `StageMetrics`.
 #[derive(Debug)]
+#[repr(align(64))]
 pub struct StageMetrics {
     /// Stage label for identification.
     pub label: String,

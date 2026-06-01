@@ -10,6 +10,9 @@ type StageFn<S> = fn(&mut S) -> Result<(), PipelineError>;
 /// Unlike `DynamicPipeline`, no heap allocation occurs after initialisation.
 /// The number of stages `N` must be known at compile time.
 ///
+/// Aligned to 64 bytes (one cache line) so the function pointer array is
+/// read from a clean cache line boundary on every `run()` call.
+///
 /// # Example
 /// ```
 /// use pipex::static_pipeline::Pipeline;
@@ -32,6 +35,7 @@ type StageFn<S> = fn(&mut S) -> Result<(), PipelineError>;
 /// pipeline.add_stage(double);
 /// ```
 #[derive(Debug)]
+#[repr(align(64))]
 pub struct Pipeline<S: Scratchpad, const N: usize> {
     stages: [Option<StageFn<S>>; N],
     count: usize,
@@ -75,14 +79,12 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
     #[inline]
     pub fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
         if self.count == 0 {
-            return Err(PipelineError::EmptyPipeline);
+            return Err(empty_pipeline());
         }
 
         if !self.validated {
             if !ctx.validate() {
-                return Err(PipelineError::ValidationFailed(String::from(
-                    "scratchpad failed validation before pipeline execution",
-                )));
+                return Err(validation_failed());
             }
             self.validated = true;
         }
@@ -101,6 +103,20 @@ impl<S: Scratchpad, const N: usize> Default for Pipeline<S, N> {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[cold]
+#[inline(never)]
+fn empty_pipeline() -> PipelineError {
+    PipelineError::EmptyPipeline
+}
+
+#[cold]
+#[inline(never)]
+fn validation_failed() -> PipelineError {
+    PipelineError::ValidationFailed(String::from(
+        "scratchpad failed validation before pipeline execution",
+    ))
 }
 
 #[cfg(test)]
