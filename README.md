@@ -46,11 +46,11 @@ impl Stage<MyScratchpad> for NormaliseStage {
 }
 
 // 3. Build and run.
-let mut pipeline = Pipeline::new();
-pipeline.add_stage(NormaliseStage);
+let mut pipeline = Pipeline::new(MyScratchpad { input: vec![1.0, 2.0, 4.0], output: vec![0.0; 3] })
+    .stage(NormaliseStage);
 
-let mut ctx = MyScratchpad { input: vec![1.0, 2.0, 4.0], output: vec![0.0; 3] };
-pipeline.run(&mut ctx).unwrap();
+pipeline.run().unwrap();
+let output = pipeline.context().output.clone();
 ```
 
 ---
@@ -62,9 +62,9 @@ pipeline.run(&mut ctx).unwrap();
 ```rust
 use pipex::dynamic_pipeline::Pipeline;
 
-let mut pipeline = Pipeline::new();
-pipeline.add_stage(NormaliseStage);
-pipeline.add_stage(ClampStage);
+let mut pipeline = Pipeline::new(MyScratchpad { input: vec![1.0, 2.0], output: vec![0.0; 2] })
+    .stage(NormaliseStage)
+    .stage(ClampStage);
 ```
 
 **Static** — use when all stages are known at compile time. Zero heap allocation after setup, no vtable overhead. Capacity is fixed at `N`.
@@ -72,7 +72,7 @@ pipeline.add_stage(ClampStage);
 ```rust
 use pipex::static_pipeline::Pipeline;
 
-let mut pipeline = Pipeline::<MyScratchpad, 2>::new();
+let mut pipeline = Pipeline::<MyScratchpad, 2>::new(MyScratchpad { input: vec![1.0, 2.0], output: vec![0.0; 2] });
 pipeline.add_stage(normalise)?;
 pipeline.add_stage(clamp)?;
 ```
@@ -100,8 +100,10 @@ use pipex::metrics::{StageMetrics, Timed};
 use std::sync::Arc;
 
 let metrics = StageMetrics::new("normalise");
-pipeline.add_stage(Timed::new(NormaliseStage, Arc::clone(&metrics)));
+let mut pipeline = Pipeline::new(ctx)
+    .stage(Timed::new(NormaliseStage, Arc::clone(&metrics)));
 
+pipeline.run().unwrap();
 let snapshot = metrics.snapshot();
 println!("p99: {}ns  p999: {}ns  errors: {}", snapshot.p99_ns, snapshot.p999_ns, snapshot.error_count);
 ```

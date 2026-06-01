@@ -73,14 +73,13 @@ mod zero_alloc_tests {
 
     #[test]
     fn dynamic_pipeline_does_not_allocate_during_run() {
-        let mut pipeline = DynamicPipeline::new();
-        pipeline.add_stage(ScaleStage);
-        let mut ctx = ZeroAllocScratchpad {
+        let mut pipeline = DynamicPipeline::new(ZeroAllocScratchpad {
             values: vec![1.0, 2.0, 3.0],
-        };
+        })
+        .stage(ScaleStage);
 
         ALLOCATOR.reset();
-        pipeline.run(&mut ctx).unwrap();
+        pipeline.run().unwrap();
 
         assert_eq!(
             ALLOCATOR.count(),
@@ -91,14 +90,13 @@ mod zero_alloc_tests {
 
     #[test]
     fn static_pipeline_does_not_allocate_during_run() {
-        let mut pipeline = StaticPipeline::<ZeroAllocScratchpad, 1>::new();
-        pipeline.add_stage(scale).unwrap();
-        let mut ctx = ZeroAllocScratchpad {
+        let mut pipeline = StaticPipeline::<ZeroAllocScratchpad, 1>::new(ZeroAllocScratchpad {
             values: vec![1.0, 2.0, 3.0],
-        };
+        });
+        pipeline.add_stage(scale).unwrap();
 
         ALLOCATOR.reset();
-        pipeline.run(&mut ctx).unwrap();
+        pipeline.run().unwrap();
 
         assert_eq!(ALLOCATOR.count(), 0, "static pipeline allocated during run");
     }

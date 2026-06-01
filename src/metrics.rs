@@ -205,8 +205,8 @@ impl StageMetrics {
 /// }
 ///
 /// let metrics = StageMetrics::new("my_stage");
-/// let mut pipeline = Pipeline::new();
-/// pipeline.add_stage(Timed::new(MyStage, Arc::clone(&metrics)));
+/// let mut pipeline = Pipeline::new(MyScratchpad)
+///     .stage(Timed::new(MyStage, Arc::clone(&metrics)));
 /// ```
 #[derive(Debug)]
 pub struct Timed<S: Scratchpad, T: Stage<S>> {

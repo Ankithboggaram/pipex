@@ -34,8 +34,8 @@ use crate::stage::Stage;
 ///     }
 /// }
 ///
-/// let mut pipeline = Pipeline::new();
-/// pipeline.add_stage(Instrumented::new(MyStage, "my_stage"));
+/// let mut pipeline = Pipeline::new(MyScratchpad)
+///     .stage(Instrumented::new(MyStage, "my_stage"));
 /// ```
 #[derive(Debug)]
 pub struct Instrumented<S: Scratchpad, T: Stage<S>> {

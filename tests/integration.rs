@@ -73,6 +73,7 @@ impl Stage<MlScratchpad> for AlwaysFailStage {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn normalise(ctx: &mut MlScratchpad) -> Result<(), PipelineError> {
     let max = ctx.raw.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     if max == 0.0 {
@@ -87,6 +88,7 @@ fn normalise(ctx: &mut MlScratchpad) -> Result<(), PipelineError> {
     Ok(())
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn clamp(ctx: &mut MlScratchpad) -> Result<(), PipelineError> {
     ctx.clamped
         .iter_mut()
@@ -100,76 +102,59 @@ mod dynamic_pipeline_tests {
 
     #[test]
     fn runs_stages_in_order() {
-        let mut pipeline = DynamicPipeline::new();
-        pipeline.add_stage(NormaliseStage);
-        pipeline.add_stage(ClampStage);
+        let mut pipeline = DynamicPipeline::new(MlScratchpad::new(vec![1.0, 2.0, 4.0, 8.0]))
+            .stage(NormaliseStage)
+            .stage(ClampStage);
+        pipeline.run().unwrap();
 
-        let mut ctx = MlScratchpad::new(vec![1.0, 2.0, 4.0, 8.0]);
-        pipeline.run(&mut ctx).unwrap();
-
-        assert!((ctx.clamped[0] - 0.125).abs() < 1e-6);
-        assert!((ctx.clamped[1] - 0.25).abs() < 1e-6);
-        assert!((ctx.clamped[2] - 0.5).abs() < 1e-6);
-        assert!((ctx.clamped[3] - 0.9).abs() < 1e-6);
+        assert!((pipeline.context().clamped[0] - 0.125).abs() < 1e-6);
+        assert!((pipeline.context().clamped[1] - 0.25).abs() < 1e-6);
+        assert!((pipeline.context().clamped[2] - 0.5).abs() < 1e-6);
+        assert!((pipeline.context().clamped[3] - 0.9).abs() < 1e-6);
     }
 
     #[test]
     fn returns_empty_pipeline_error() {
-        let mut pipeline: DynamicPipeline<MlScratchpad> = DynamicPipeline::new();
-        let mut ctx = MlScratchpad::new(vec![1.0, 2.0]);
-        assert!(matches!(
-            pipeline.run(&mut ctx),
-            Err(PipelineError::EmptyPipeline)
-        ));
+        let mut pipeline: DynamicPipeline<MlScratchpad> =
+            DynamicPipeline::new(MlScratchpad::new(vec![1.0, 2.0]));
+        assert!(matches!(pipeline.run(), Err(PipelineError::EmptyPipeline)));
     }
 
     #[test]
     fn returns_validation_error_on_empty_scratchpad() {
-        let mut pipeline = DynamicPipeline::new();
-        pipeline.add_stage(NormaliseStage);
-        let mut ctx = MlScratchpad::new(vec![]);
+        let mut pipeline = DynamicPipeline::new(MlScratchpad::new(vec![])).stage(NormaliseStage);
         assert!(matches!(
-            pipeline.run(&mut ctx),
+            pipeline.run(),
             Err(PipelineError::ValidationFailed(_))
         ));
     }
 
     #[test]
     fn returns_stage_error_on_failure() {
-        let mut pipeline = DynamicPipeline::new();
-        pipeline.add_stage(AlwaysFailStage);
-        let mut ctx = MlScratchpad::new(vec![1.0, 2.0]);
-        assert!(matches!(
-            pipeline.run(&mut ctx),
-            Err(PipelineError::StageFailed(_))
-        ));
+        let mut pipeline =
+            DynamicPipeline::new(MlScratchpad::new(vec![1.0, 2.0])).stage(AlwaysFailStage);
+        assert!(matches!(pipeline.run(), Err(PipelineError::StageFailed(_))));
     }
 
     #[test]
     fn stage_error_propagates_message() {
-        let mut pipeline = DynamicPipeline::new();
-        pipeline.add_stage(NormaliseStage);
-        let mut ctx = MlScratchpad::new(vec![0.0, 0.0, 0.0]);
-        assert!(matches!(
-            pipeline.run(&mut ctx),
-            Err(PipelineError::StageFailed(_))
-        ));
+        let mut pipeline =
+            DynamicPipeline::new(MlScratchpad::new(vec![0.0, 0.0, 0.0])).stage(NormaliseStage);
+        assert!(matches!(pipeline.run(), Err(PipelineError::StageFailed(_))));
     }
 
     #[test]
     fn can_run_multiple_times() {
-        let mut pipeline = DynamicPipeline::new();
-        pipeline.add_stage(NormaliseStage);
+        let mut pipeline =
+            DynamicPipeline::new(MlScratchpad::new(vec![1.0, 2.0, 4.0])).stage(NormaliseStage);
+        pipeline.run().unwrap();
+        let first_result = pipeline.context().normalised.clone();
 
-        let mut ctx = MlScratchpad::new(vec![1.0, 2.0, 4.0]);
-        pipeline.run(&mut ctx).unwrap();
-        let first_result = ctx.normalised.clone();
+        pipeline.context_mut().raw = vec![2.0, 4.0, 8.0];
+        pipeline.context_mut().reset();
+        pipeline.run().unwrap();
 
-        ctx.raw = vec![2.0, 4.0, 8.0];
-        ctx.reset();
-        pipeline.run(&mut ctx).unwrap();
-
-        assert_eq!(ctx.normalised, first_result);
+        assert_eq!(pipeline.context().normalised, first_result);
     }
 }
 
@@ -178,32 +163,29 @@ mod static_pipeline_tests {
 
     #[test]
     fn runs_stages_in_order() {
-        let mut pipeline = StaticPipeline::<MlScratchpad, 2>::new();
+        let mut pipeline =
+            StaticPipeline::<MlScratchpad, 2>::new(MlScratchpad::new(vec![1.0, 2.0, 4.0, 8.0]));
         pipeline.add_stage(normalise).unwrap();
         pipeline.add_stage(clamp).unwrap();
+        pipeline.run().unwrap();
 
-        let mut ctx = MlScratchpad::new(vec![1.0, 2.0, 4.0, 8.0]);
-        pipeline.run(&mut ctx).unwrap();
-
-        assert!((ctx.clamped[0] - 0.125).abs() < 1e-6);
-        assert!((ctx.clamped[1] - 0.25).abs() < 1e-6);
-        assert!((ctx.clamped[2] - 0.5).abs() < 1e-6);
-        assert!((ctx.clamped[3] - 0.9).abs() < 1e-6);
+        assert!((pipeline.context().clamped[0] - 0.125).abs() < 1e-6);
+        assert!((pipeline.context().clamped[1] - 0.25).abs() < 1e-6);
+        assert!((pipeline.context().clamped[2] - 0.5).abs() < 1e-6);
+        assert!((pipeline.context().clamped[3] - 0.9).abs() < 1e-6);
     }
 
     #[test]
     fn returns_empty_pipeline_error() {
-        let mut pipeline = StaticPipeline::<MlScratchpad, 2>::new();
-        let mut ctx = MlScratchpad::new(vec![1.0, 2.0]);
-        assert!(matches!(
-            pipeline.run(&mut ctx),
-            Err(PipelineError::EmptyPipeline)
-        ));
+        let mut pipeline =
+            StaticPipeline::<MlScratchpad, 2>::new(MlScratchpad::new(vec![1.0, 2.0]));
+        assert!(matches!(pipeline.run(), Err(PipelineError::EmptyPipeline)));
     }
 
     #[test]
     fn returns_error_when_over_capacity() {
-        let mut pipeline = StaticPipeline::<MlScratchpad, 1>::new();
+        let mut pipeline =
+            StaticPipeline::<MlScratchpad, 1>::new(MlScratchpad::new(vec![1.0, 2.0]));
         pipeline.add_stage(normalise).unwrap();
         assert!(matches!(
             pipeline.add_stage(clamp),
@@ -213,11 +195,10 @@ mod static_pipeline_tests {
 
     #[test]
     fn returns_validation_error_on_empty_scratchpad() {
-        let mut pipeline = StaticPipeline::<MlScratchpad, 1>::new();
+        let mut pipeline = StaticPipeline::<MlScratchpad, 1>::new(MlScratchpad::new(vec![]));
         pipeline.add_stage(normalise).unwrap();
-        let mut ctx = MlScratchpad::new(vec![]);
         assert!(matches!(
-            pipeline.run(&mut ctx),
+            pipeline.run(),
             Err(PipelineError::ValidationFailed(_))
         ));
     }
@@ -228,32 +209,25 @@ mod retry_tests {
 
     #[test]
     fn succeeds_on_first_attempt() {
-        let mut pipeline = DynamicPipeline::new();
-        pipeline.add_stage(Retry::new(NormaliseStage, 3));
-
-        let mut ctx = MlScratchpad::new(vec![1.0, 2.0, 4.0]);
-        assert!(pipeline.run(&mut ctx).is_ok());
+        let mut pipeline = DynamicPipeline::new(MlScratchpad::new(vec![1.0, 2.0, 4.0]))
+            .stage(Retry::new(NormaliseStage, 3));
+        assert!(pipeline.run().is_ok());
     }
 
     #[test]
     fn exhausts_retries_on_persistent_failure() {
-        let mut pipeline = DynamicPipeline::new();
-        pipeline.add_stage(Retry::new(AlwaysFailStage, 2));
-
-        let mut ctx = MlScratchpad::new(vec![1.0, 2.0]);
-        let result = pipeline.run(&mut ctx);
+        let mut pipeline = DynamicPipeline::new(MlScratchpad::new(vec![1.0, 2.0]))
+            .stage(Retry::new(AlwaysFailStage, 2));
+        let result = pipeline.run();
         assert!(matches!(result, Err(PipelineError::RetryExhausted { .. })));
     }
 
     #[test]
     fn resets_scratchpad_between_attempts() {
-        let mut pipeline = DynamicPipeline::new();
-        pipeline.add_stage(Retry::new(AlwaysFailStage, 2));
-
-        let mut ctx = MlScratchpad::new(vec![1.0, 2.0]);
-        pipeline.run(&mut ctx).ok();
-
-        assert!(ctx.normalised.iter().all(|x| *x == 0.0));
+        let mut pipeline = DynamicPipeline::new(MlScratchpad::new(vec![1.0, 2.0]))
+            .stage(Retry::new(AlwaysFailStage, 2));
+        pipeline.run().ok();
+        assert!(pipeline.context().normalised.iter().all(|x| *x == 0.0));
     }
 }
 
@@ -262,22 +236,18 @@ mod consistency_tests {
 
     #[test]
     fn dynamic_and_static_produce_identical_results() {
-        let mut dynamic = DynamicPipeline::new();
-        dynamic.add_stage(NormaliseStage);
-        dynamic.add_stage(ClampStage);
-
-        let mut static_p = StaticPipeline::<MlScratchpad, 2>::new();
-        static_p.add_stage(normalise).unwrap();
-        static_p.add_stage(clamp).unwrap();
-
         let data = vec![1.0, 2.0, 4.0, 8.0];
 
-        let mut dynamic_ctx = MlScratchpad::new(data.clone());
-        dynamic.run(&mut dynamic_ctx).unwrap();
+        let mut dynamic = DynamicPipeline::new(MlScratchpad::new(data.clone()))
+            .stage(NormaliseStage)
+            .stage(ClampStage);
+        dynamic.run().unwrap();
 
-        let mut static_ctx = MlScratchpad::new(data);
-        static_p.run(&mut static_ctx).unwrap();
+        let mut static_p = StaticPipeline::<MlScratchpad, 2>::new(MlScratchpad::new(data));
+        static_p.add_stage(normalise).unwrap();
+        static_p.add_stage(clamp).unwrap();
+        static_p.run().unwrap();
 
-        assert_eq!(dynamic_ctx.clamped, static_ctx.clamped);
+        assert_eq!(dynamic.context().clamped, static_p.context().clamped);
     }
 }

@@ -33,8 +33,8 @@ use crate::stage::Stage;
 ///     }
 /// }
 ///
-/// let mut pipeline = Pipeline::new();
-/// pipeline.add_stage(Retry::new(DoubleValues, 3));
+/// let mut pipeline = Pipeline::new(MyScratchpad { value: 1.0 })
+///     .stage(Retry::new(DoubleValues, 3));
 /// ```
 #[derive(Debug)]
 pub struct Retry<S: Scratchpad, T: Stage<S>> {

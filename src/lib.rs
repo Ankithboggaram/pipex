@@ -51,11 +51,10 @@
 //!     }
 //! }
 //!
-//! let mut pipeline = Pipeline::new();
-//! pipeline.add_stage(Normalise);
+//! let mut pipeline = Pipeline::new(Buffer { values: vec![1.0, 2.0, 4.0], output: vec![0.0; 3] })
+//!     .stage(Normalise);
 //!
-//! let mut buf = Buffer { values: vec![1.0, 2.0, 4.0], output: vec![0.0; 3] };
-//! pipeline.run(&mut buf).unwrap();
+//! pipeline.run().unwrap();
 //! ```
 
 pub mod dynamic_pipeline;

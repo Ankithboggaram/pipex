@@ -10,8 +10,11 @@ type StageFn<S> = fn(&mut S) -> Result<(), PipelineError>;
 /// Unlike `DynamicPipeline`, no heap allocation occurs after initialisation.
 /// The number of stages `N` must be known at compile time.
 ///
+/// The pipeline owns its scratchpad. Use [`context`][Pipeline::context] and
+/// [`context_mut`][Pipeline::context_mut] to write inputs and read outputs.
+///
 /// Aligned to 64 bytes (one cache line) so the function pointer array is
-/// read from a clean cache line boundary on every `run()` call.
+/// read from a clean cache-line boundary on every `run()` call.
 ///
 /// # Example
 /// ```
@@ -31,23 +34,34 @@ type StageFn<S> = fn(&mut S) -> Result<(), PipelineError>;
 ///     Ok(())
 /// }
 ///
-/// let mut pipeline = Pipeline::<MyScratchpad, 1>::new();
-/// pipeline.add_stage(double);
+/// let mut pipeline = Pipeline::<MyScratchpad, 1>::new(MyScratchpad { value: 2.0 });
+/// pipeline.add_stage(double).unwrap();
 /// ```
-#[derive(Debug)]
 #[repr(align(64))]
 pub struct Pipeline<S: Scratchpad, const N: usize> {
     stages: [Option<StageFn<S>>; N],
+    ctx: S,
     count: usize,
     validated: bool,
+}
+
+impl<S: Scratchpad, const N: usize> std::fmt::Debug for Pipeline<S, N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Pipeline")
+            .field("stages", &self.count)
+            .field("capacity", &N)
+            .field("validated", &self.validated)
+            .finish()
+    }
 }
 
 impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
     /// Creates a new empty static pipeline with capacity for `N` stages.
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(ctx: S) -> Self {
         Self {
             stages: [None; N],
+            ctx,
             count: 0,
             validated: false,
         }
@@ -69,7 +83,18 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
         Ok(())
     }
 
-    /// Runs all stages in order against the provided scratchpad.
+    /// Returns a reference to the pipeline's scratchpad.
+    #[must_use]
+    pub fn context(&self) -> &S {
+        &self.ctx
+    }
+
+    /// Returns a mutable reference to the pipeline's scratchpad.
+    pub fn context_mut(&mut self) -> &mut S {
+        &mut self.ctx
+    }
+
+    /// Runs all stages in order against the pipeline's scratchpad.
     ///
     /// # Errors
     ///
@@ -77,13 +102,13 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
     /// `PipelineError::ValidationFailed` if the scratchpad fails validation,
     /// or the error from the first stage that fails.
     #[inline]
-    pub fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
+    pub fn run(&mut self) -> Result<(), PipelineError> {
         if self.count == 0 {
             return Err(empty_pipeline());
         }
 
         if !self.validated {
-            if !ctx.validate() {
+            if !self.ctx.validate() {
                 return Err(validation_failed());
             }
             self.validated = true;
@@ -91,17 +116,11 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
 
         for i in 0..self.count {
             if let Some(stage) = self.stages[i] {
-                stage(ctx)?;
+                stage(&mut self.ctx)?;
             }
         }
 
         Ok(())
-    }
-}
-
-impl<S: Scratchpad, const N: usize> Default for Pipeline<S, N> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -147,11 +166,13 @@ mod tests {
         }
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn double(ctx: &mut TestScratchpad) -> Result<(), PipelineError> {
         ctx.value *= 2.0;
         Ok(())
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn failing(_ctx: &mut TestScratchpad) -> Result<(), PipelineError> {
         Err(PipelineError::StageFailed(String::from(
             "intentional failure",
@@ -160,38 +181,32 @@ mod tests {
 
     #[test]
     fn empty_pipeline_returns_error() {
-        let mut pipeline = Pipeline::<TestScratchpad, 2>::new();
-        let mut ctx = TestScratchpad::new(1.0);
-        assert!(matches!(
-            pipeline.run(&mut ctx),
-            Err(PipelineError::EmptyPipeline)
-        ));
+        let mut pipeline = Pipeline::<TestScratchpad, 2>::new(TestScratchpad::new(1.0));
+        assert!(matches!(pipeline.run(), Err(PipelineError::EmptyPipeline)));
     }
 
     #[test]
     fn validation_failure_blocks_execution() {
-        let mut pipeline = Pipeline::<TestScratchpad, 2>::new();
+        let mut pipeline = Pipeline::<TestScratchpad, 2>::new(TestScratchpad::new(1.0));
         pipeline.add_stage(double).unwrap();
-        let mut ctx = TestScratchpad::new(1.0);
-        ctx.is_valid = false;
+        pipeline.context_mut().is_valid = false;
         assert!(matches!(
-            pipeline.run(&mut ctx),
+            pipeline.run(),
             Err(PipelineError::ValidationFailed(_))
         ));
     }
 
     #[test]
     fn stage_runs_and_modifies_scratchpad() {
-        let mut pipeline = Pipeline::<TestScratchpad, 2>::new();
+        let mut pipeline = Pipeline::<TestScratchpad, 2>::new(TestScratchpad::new(2.0));
         pipeline.add_stage(double).unwrap();
-        let mut ctx = TestScratchpad::new(2.0);
-        assert!(pipeline.run(&mut ctx).is_ok());
-        assert_eq!(ctx.value, 4.0);
+        assert!(pipeline.run().is_ok());
+        assert_eq!(pipeline.context().value, 4.0);
     }
 
     #[test]
     fn pipeline_at_capacity_returns_error() {
-        let mut pipeline = Pipeline::<TestScratchpad, 1>::new();
+        let mut pipeline = Pipeline::<TestScratchpad, 1>::new(TestScratchpad::new(1.0));
         pipeline.add_stage(double).unwrap();
         let result = pipeline.add_stage(failing);
         assert!(matches!(result, Err(PipelineError::StageFailed(_))));
@@ -199,12 +214,8 @@ mod tests {
 
     #[test]
     fn failing_stage_returns_error() {
-        let mut pipeline = Pipeline::<TestScratchpad, 1>::new();
+        let mut pipeline = Pipeline::<TestScratchpad, 1>::new(TestScratchpad::new(1.0));
         pipeline.add_stage(failing).unwrap();
-        let mut ctx = TestScratchpad::new(1.0);
-        assert!(matches!(
-            pipeline.run(&mut ctx),
-            Err(PipelineError::StageFailed(_))
-        ));
+        assert!(matches!(pipeline.run(), Err(PipelineError::StageFailed(_))));
     }
 }
