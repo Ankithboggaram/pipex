@@ -20,6 +20,11 @@ pub enum PipelineError {
     ///
     /// Carries the number of attempts made and the final error message.
     RetryExhausted { attempts: u32, reason: String },
+
+    /// A stage completed successfully but exceeded its time budget.
+    ///
+    /// Carries the budget and actual elapsed time, both in nanoseconds.
+    DeadlineExceeded { budget_ns: u64, elapsed_ns: u64 },
 }
 
 impl std::fmt::Display for PipelineError {
@@ -31,6 +36,15 @@ impl std::fmt::Display for PipelineError {
             PipelineError::InvalidState(msg) => write!(f, "invalid state: {msg}"),
             PipelineError::RetryExhausted { attempts, reason } => {
                 write!(f, "stage failed after {attempts} attempts: {reason}")
+            }
+            PipelineError::DeadlineExceeded {
+                budget_ns,
+                elapsed_ns,
+            } => {
+                write!(
+                    f,
+                    "stage exceeded deadline: budget {budget_ns}ns, elapsed {elapsed_ns}ns"
+                )
             }
         }
     }

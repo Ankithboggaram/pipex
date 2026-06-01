@@ -40,7 +40,7 @@ use crate::stage::Stage;
 pub struct Retry<S: Scratchpad, T: Stage<S>> {
     stage: T,
     retries: u32,
-    _marker: std::marker::PhantomData<S>,
+    _marker: std::marker::PhantomData<fn(S) -> S>,
 }
 
 impl<S: Scratchpad, T: Stage<S>> Retry<S, T> {

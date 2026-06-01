@@ -57,6 +57,7 @@
 //! pipeline.run().unwrap();
 //! ```
 
+pub mod deadline;
 pub mod dynamic_pipeline;
 pub mod error;
 pub mod instrument;

@@ -212,7 +212,7 @@ impl StageMetrics {
 pub struct Timed<S: Scratchpad, T: Stage<S>> {
     stage: T,
     metrics: Arc<StageMetrics>,
-    _marker: std::marker::PhantomData<S>,
+    _marker: std::marker::PhantomData<fn(S) -> S>,
 }
 
 impl<S: Scratchpad, T: Stage<S>> Timed<S, T> {

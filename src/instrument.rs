@@ -41,7 +41,7 @@ use crate::stage::Stage;
 pub struct Instrumented<S: Scratchpad, T: Stage<S>> {
     stage: T,
     name: &'static str,
-    _marker: std::marker::PhantomData<S>,
+    _marker: std::marker::PhantomData<fn(S) -> S>,
 }
 
 impl<S: Scratchpad, T: Stage<S>> Instrumented<S, T> {
