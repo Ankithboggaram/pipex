@@ -259,6 +259,106 @@ fn fetch_max(atomic: &AtomicU64, value: u64) {
     }
 }
 
+/// A point-in-time snapshot of metrics for all tracked stages in a pipeline.
+#[derive(Debug, Clone)]
+pub struct PipelineSnapshot {
+    /// Snapshots for each tracked stage, in registration order.
+    pub stages: Vec<StageSnapshot>,
+}
+
+impl PipelineSnapshot {
+    /// Returns the stage with the highest p99 latency, or `None` if empty.
+    #[must_use]
+    pub fn slowest_stage(&self) -> Option<&StageSnapshot> {
+        self.stages.iter().max_by_key(|s| s.p99_ns)
+    }
+
+    /// Returns all stages that have recorded at least one error.
+    pub fn error_stages(&self) -> impl Iterator<Item = &StageSnapshot> {
+        self.stages.iter().filter(|s| s.error_count > 0)
+    }
+
+    /// Returns the total execution count across all stages.
+    #[must_use]
+    pub fn total_count(&self) -> u64 {
+        self.stages.iter().map(|s| s.count).sum()
+    }
+}
+
+impl std::fmt::Display for PipelineSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for stage in &self.stages {
+            writeln!(f, "{}", stage.summary())?;
+        }
+        Ok(())
+    }
+}
+
+/// Collects and aggregates metrics for all stages in a pipeline.
+///
+/// Create one `PipelineMetrics` per pipeline, register each stage via
+/// [`track`][PipelineMetrics::track], and call [`snapshot`][PipelineMetrics::snapshot]
+/// to read all stage metrics in a single call.
+///
+/// # Example
+/// ```
+/// use pipex::metrics::{PipelineMetrics, Timed};
+/// use pipex::dynamic_pipeline::Pipeline;
+/// use pipex::scratchpad::Scratchpad;
+/// use pipex::stage::Stage;
+/// use pipex::error::PipelineError;
+///
+/// struct MyScratchpad;
+/// impl Scratchpad for MyScratchpad {
+///     fn reset(&mut self) {}
+///     fn validate(&self) -> bool { true }
+/// }
+///
+/// struct NoopStage;
+/// impl Stage<MyScratchpad> for NoopStage {
+///     fn run(&mut self, _ctx: &mut MyScratchpad) -> Result<(), PipelineError> { Ok(()) }
+/// }
+///
+/// let mut pm = PipelineMetrics::new();
+///
+/// let mut pipeline = Pipeline::new(MyScratchpad)
+///     .stage(Timed::new(NoopStage, pm.track("noop")));
+///
+/// pipeline.run().unwrap();
+///
+/// let snapshot = pm.snapshot();
+/// assert_eq!(snapshot.stages.len(), 1);
+/// assert_eq!(snapshot.total_count(), 1);
+/// ```
+#[derive(Debug, Default)]
+pub struct PipelineMetrics {
+    metrics: Vec<Arc<StageMetrics>>,
+}
+
+impl PipelineMetrics {
+    /// Creates a new empty `PipelineMetrics` collector.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Creates a new [`StageMetrics`] with the given label, registers it for
+    /// tracking, and returns an `Arc` suitable for passing to [`Timed::new`].
+    pub fn track(&mut self, label: impl Into<String>) -> Arc<StageMetrics> {
+        let m = StageMetrics::new(label);
+        self.metrics.push(Arc::clone(&m));
+        m
+    }
+
+    /// Returns a point-in-time snapshot of all tracked stages.
+    #[must_use]
+    pub fn snapshot(&self) -> PipelineSnapshot {
+        PipelineSnapshot {
+            stages: self.metrics.iter().map(|m| m.snapshot()).collect(),
+        }
+    }
+}
+
 fn percentile(sorted: &[u64], p: usize) -> u64 {
     if sorted.is_empty() {
         return 0;
