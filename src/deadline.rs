@@ -15,7 +15,7 @@ use crate::stage::Stage;
 /// its error is returned regardless of elapsed time.
 ///
 /// Note: this is a deadline guard, not a preemptive timeout. The stage
-/// runs to completion on the current thread — execution cannot be
+/// runs to completion on the current thread. Execution cannot be
 /// interrupted mid-flight. Use this to surface latency violations as
 /// pipeline errors and enable circuit breaking or SLA enforcement.
 ///

@@ -276,9 +276,9 @@ mod tests {
     fn overflow_pipeline_is_dropped_not_returned() {
         let pool: PipelinePool<Pipeline<Buf, 1>> = PipelinePool::new(1, make_pipeline);
         let g1 = pool.acquire();
-        let g2 = pool.acquire(); // overflow — comes from factory
+        let g2 = pool.acquire(); // overflow, comes from factory
         drop(g1); // returned (available = 1, at capacity)
-        drop(g2); // dropped — would exceed capacity
+        drop(g2); // dropped, would exceed capacity
         assert_eq!(pool.available(), 1);
     }
 

@@ -8,21 +8,21 @@
 //!
 //! Two execution models are provided:
 //!
-//! - [`dynamic_pipeline::Pipeline`] — stages stored as [`Box<dyn Stage<S>>`][stage::Stage],
+//! - [`dynamic_pipeline::Pipeline`]: stages stored as [`Box<dyn Stage<S>>`][stage::Stage],
 //!   supporting heterogeneous stage types configured at runtime.
-//! - [`static_pipeline::Pipeline`] — stages stored as a fixed-size array of function
+//! - [`static_pipeline::Pipeline`]: stages stored as a fixed-size array of function
 //!   pointers, with no heap allocation after initialisation and no vtable overhead.
 //!
 //! # Composable wrappers
 //!
 //! Stages can be decorated with the following wrappers, which compose cleanly:
 //!
-//! - [`retry::Retry`] — retries a failing stage up to N times, resetting the
+//! - [`retry::Retry`]: retries a failing stage up to N times, resetting the
 //!   scratchpad between attempts.
-//! - [`metrics::Timed`] — records per-stage execution latency using lock-free
+//! - [`metrics::Timed`]: records per-stage execution latency using lock-free
 //!   atomics and a rolling window for percentile computation.
-//! - [`instrument::Instrumented`] — emits a [`tracing`] span on every stage execution.
-//! - [`deadline::Deadline`] — returns an error if a stage exceeds a time budget.
+//! - [`instrument::Instrumented`]: emits a [`tracing`] span on every stage execution.
+//! - [`deadline::Deadline`]: returns an error if a stage exceeds a time budget.
 //!
 //! # Pooling
 //!

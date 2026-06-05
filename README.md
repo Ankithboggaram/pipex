@@ -23,7 +23,7 @@ use pipex::stage::Stage;
 use pipex::dynamic_pipeline::Pipeline;
 use pipex::error::PipelineError;
 
-// 1. Define your scratchpad — the shared buffer stages read from and write to.
+// 1. Define your scratchpad: the shared buffer stages read from and write to.
 struct MyScratchpad {
     input: Vec<f32>,
     output: Vec<f32>,
@@ -57,7 +57,7 @@ let output = pipeline.context().output.clone();
 
 ## Choosing a pipeline type
 
-**Dynamic** — use when stage types differ or the pipeline is configured at runtime.
+**Dynamic**: use when stage types differ or the pipeline is configured at runtime.
 
 ```rust
 use pipex::dynamic_pipeline::Pipeline;
@@ -67,7 +67,7 @@ let mut pipeline = Pipeline::new(MyScratchpad { input: vec![1.0, 2.0], output: v
     .stage(ClampStage);
 ```
 
-**Static** — use when all stages are known at compile time. Zero heap allocation after setup, no vtable overhead. Capacity is fixed at `N`.
+**Static**: use when all stages are known at compile time. Zero heap allocation after setup, no vtable overhead. Capacity is fixed at `N`.
 
 ```rust
 use pipex::static_pipeline::Pipeline;
@@ -152,7 +152,7 @@ Measured on Apple Silicon using [divan](https://github.com/nvzqz/divan). Scratch
 | 5 | 7.7 µs | 7.7 µs |
 | 10 | 14.7 µs | 14.9 µs |
 
-Both pipelines scale linearly. At large data sizes dispatch method is irrelevant — memory bandwidth dominates. Static pipeline advantage is most visible at small data sizes where vtable overhead is proportionally larger.
+Both pipelines scale linearly. At large data sizes dispatch method is irrelevant, memory bandwidth dominates. Static pipeline advantage is most visible at small data sizes where vtable overhead is proportionally larger.
 
 **Wrapper overhead**: `Instrumented` is zero-cost when no tracing subscriber is configured. `Timed` adds ~70ns per stage call for atomic writes and clock reads.
 
@@ -160,7 +160,7 @@ Both pipelines scale linearly. At large data sizes dispatch method is irrelevant
 
 **Mixed stage types**: no performance penalty versus same-type stages.
 
-**Zero allocation guarantee**: verified by test — neither pipeline allocates during `run()` on the success path.
+**Zero allocation guarantee**: verified by test, neither pipeline allocates during `run()` on the success path.
 
 ---
 
@@ -180,7 +180,7 @@ Both pipelines scale linearly. At large data sizes dispatch method is irrelevant
 - [x] Per-stage retry via `retry::Retry`
 - [x] Per-stage timing metrics via `metrics::Timed`
 - [x] Per-stage tracing spans via `instrument::Instrumented`
+- [x] Buffer pooling
 - [ ] Parallel stage execution
 - [ ] Arena allocation
-- [ ] Buffer pooling
 - [ ] Task graphs

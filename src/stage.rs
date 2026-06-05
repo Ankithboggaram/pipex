@@ -31,8 +31,8 @@ pub trait Stage<S: Scratchpad>: Send {
     fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError>;
 }
 
-// Provided for downstream wiring code that builds stages incrementally at
-// runtime — allows a boxed stage to be passed into Timed, Instrumented, or
+// Provided for wiring code that builds stages incrementally at
+// runtime. Allows a boxed stage to be passed into Timed, Instrumented, or
 // Retry without knowing the concrete type at compile time.
 impl<S: Scratchpad> Stage<S> for Box<dyn Stage<S>> {
     #[inline]
