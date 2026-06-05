@@ -189,7 +189,7 @@ mod static_pipeline_tests {
         pipeline.add_stage(normalise).unwrap();
         assert!(matches!(
             pipeline.add_stage(clamp),
-            Err(PipelineError::StageFailed(_))
+            Err(PipelineError::FullPipeline)
         ));
     }
 

@@ -13,6 +13,9 @@ pub enum PipelineError {
     /// The pipeline has no stages to execute.
     EmptyPipeline,
 
+    /// The pipeline has no more room to grow.
+    FullPipeline,
+
     /// The scratchpad was in an unexpected state during execution.
     InvalidState(String),
 
@@ -33,6 +36,7 @@ impl std::fmt::Display for PipelineError {
             PipelineError::StageFailed(msg) => write!(f, "stage failed: {msg}"),
             PipelineError::ValidationFailed(msg) => write!(f, "validation failed: {msg}"),
             PipelineError::EmptyPipeline => write!(f, "pipeline has no stages"),
+            PipelineError::FullPipeline => write!(f, "pipeline has no more room to grow"),
             PipelineError::InvalidState(msg) => write!(f, "invalid state: {msg}"),
             PipelineError::RetryExhausted { attempts, reason } => {
                 write!(f, "stage failed after {attempts} attempts: {reason}")
@@ -72,6 +76,18 @@ mod tests {
     fn empty_pipeline_is_debug_printable() {
         let error = PipelineError::EmptyPipeline;
         assert!(format!("{error:?}").contains("EmptyPipeline"));
+    }
+
+    #[test]
+    fn full_pipeline_is_debug_printable() {
+        let error = PipelineError::FullPipeline;
+        assert!(format!("{error:?}").contains("FullPipeline"));
+    }
+
+    #[test]
+    fn full_pipeline_display_message() {
+        let error = PipelineError::FullPipeline;
+        assert_eq!(format!("{error}"), "pipeline has no more room to grow");
     }
 
     #[test]

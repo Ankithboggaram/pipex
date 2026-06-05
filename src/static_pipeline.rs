@@ -71,12 +71,10 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
     ///
     /// # Errors
     ///
-    /// Returns `PipelineError::StageFailed` if the pipeline is already at capacity.
+    /// Returns `PipelineError::FullPipeline` if the pipeline is already at capacity.
     pub fn add_stage(&mut self, stage: StageFn<S>) -> Result<(), PipelineError> {
         if self.count >= N {
-            return Err(PipelineError::StageFailed(String::from(
-                "pipeline is at capacity",
-            )));
+            return Err(PipelineError::FullPipeline);
         }
         self.stages[self.count] = Some(stage);
         self.count += 1;
@@ -251,7 +249,7 @@ mod tests {
         let mut pipeline = Pipeline::<TestScratchpad, 1>::new(TestScratchpad::new(1.0));
         pipeline.add_stage(double).unwrap();
         let result = pipeline.add_stage(failing);
-        assert!(matches!(result, Err(PipelineError::StageFailed(_))));
+        assert!(matches!(result, Err(PipelineError::FullPipeline)));
     }
 
     #[test]
