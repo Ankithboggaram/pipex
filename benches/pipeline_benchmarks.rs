@@ -1,13 +1,16 @@
 use divan::{Bencher, black_box};
+use pipex::deadline::Deadline;
 use pipex::dynamic_pipeline::Pipeline as DynamicPipeline;
 use pipex::error::PipelineError;
 use pipex::instrument::Instrumented;
 use pipex::metrics::{StageMetrics, Timed};
+use pipex::pool::PipelinePool;
 use pipex::retry::Retry;
 use pipex::scratchpad::Scratchpad;
 use pipex::stage::Stage;
 use pipex::static_pipeline::Pipeline as StaticPipeline;
 use std::sync::Arc;
+use std::time::Duration;
 
 fn main() {
     divan::main();
@@ -304,6 +307,68 @@ mod mixed_stages {
         bencher.bench_local(|| {
             pipeline.context_mut().reset();
             black_box(pipeline.run()).unwrap();
+        });
+    }
+}
+
+mod deadline_overhead {
+    use super::*;
+    use stages::*;
+
+    #[divan::bench]
+    fn plain_stage(bencher: Bencher) {
+        let mut pipeline = DynamicPipeline::new(BenchScratchpad::new(10_000)).stage(NormaliseStage);
+
+        bencher.bench_local(|| {
+            pipeline.context_mut().reset();
+            black_box(pipeline.run()).unwrap();
+        });
+    }
+
+    #[divan::bench]
+    fn deadline_wrapped_stage(bencher: Bencher) {
+        let mut pipeline = DynamicPipeline::new(BenchScratchpad::new(10_000))
+            .stage(Deadline::new(NormaliseStage, Duration::from_secs(1)));
+
+        bencher.bench_local(|| {
+            pipeline.context_mut().reset();
+            black_box(pipeline.run()).unwrap();
+        });
+    }
+}
+
+mod pool_overhead {
+    use super::*;
+    use stages::*;
+
+    fn make_pipeline() -> StaticPipeline<BenchScratchpad, 1> {
+        let mut p = StaticPipeline::new(BenchScratchpad::new(10_000));
+        p.add_stage(normalise).unwrap();
+        p
+    }
+
+    /// Allocates a fresh scratchpad (3 × Vec<f32> of 10k elements) on every call.
+    /// This is the realistic baseline for a server that creates a pipeline per request.
+    #[divan::bench]
+    fn new_pipeline_per_call(bencher: Bencher) {
+        bencher.bench_local(|| {
+            let mut pipeline =
+                StaticPipeline::<BenchScratchpad, 1>::new(BenchScratchpad::new(10_000));
+            pipeline.add_stage(normalise).unwrap();
+            black_box(pipeline.run()).unwrap();
+        });
+    }
+
+    /// Acquires a pre-built pipeline from the pool, runs it, and returns it.
+    /// No allocation on the hot path; scratchpad Vecs are reused.
+    #[divan::bench]
+    fn pool_acquire_run_return(bencher: Bencher) {
+        let pool = PipelinePool::new(4, make_pipeline);
+
+        bencher.bench_local(|| {
+            let mut guard = pool.acquire();
+            guard.context_mut().reset();
+            black_box(guard.run()).unwrap();
         });
     }
 }
