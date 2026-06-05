@@ -13,20 +13,31 @@ const WINDOW_SIZE: usize = 1024;
 /// A point-in-time snapshot of metrics for a single stage.
 #[derive(Debug, Clone)]
 pub struct StageSnapshot {
+    /// Stage identifier.
     pub label: String,
+    /// Total execution count.
     pub count: u64,
+    /// Number of executions that returned an error.
     pub error_count: u64,
-    /// Error rate as a fraction of total executions (0.0..1.0).
+    /// Error rate as a fraction of total executions (0.0..=1.0).
     pub error_rate: f64,
+    /// Duration of the most recent execution, in nanoseconds.
     pub last_ns: u64,
+    /// Minimum recorded execution duration, in nanoseconds.
     pub min_ns: u64,
+    /// Maximum recorded execution duration, in nanoseconds.
     pub max_ns: u64,
+    /// Mean execution duration over all recorded samples, in nanoseconds.
     pub mean_ns: u64,
+    /// 50th-percentile duration from the rolling window, in nanoseconds.
     pub p50_ns: u64,
+    /// 95th-percentile duration from the rolling window, in nanoseconds.
     pub p95_ns: u64,
+    /// 99th-percentile duration from the rolling window, in nanoseconds.
     pub p99_ns: u64,
+    /// 99.9th-percentile duration from the rolling window, in nanoseconds.
     pub p999_ns: u64,
-    /// Unix timestamp (nanoseconds) of the last execution.
+    /// Unix timestamp of the last execution, in nanoseconds since the Unix epoch.
     pub last_updated_ns: u64,
 }
 

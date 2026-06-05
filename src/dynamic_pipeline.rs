@@ -109,7 +109,7 @@ impl<S: Scratchpad> Pipeline<S> {
     ///
     /// # Errors
     ///
-    /// Returns whatever error the closure returns.
+    /// Returns the error returned by `validator`, if any.
     pub fn check<F>(&self, validator: F) -> Result<(), PipelineError>
     where
         F: FnOnce(&[TypeId]) -> Result<(), PipelineError>,
@@ -153,6 +153,13 @@ impl<S: Scratchpad> Pipeline<S> {
         }
 
         Ok(())
+    }
+}
+
+impl<S: Scratchpad> crate::pool::PoolablePipeline for Pipeline<S> {
+    fn reset_for_reuse(&mut self) {
+        self.ctx.reset();
+        self.validated = false;
     }
 }
 

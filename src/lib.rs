@@ -22,6 +22,14 @@
 //! - [`metrics::Timed`] — records per-stage execution latency using lock-free
 //!   atomics and a rolling window for percentile computation.
 //! - [`instrument::Instrumented`] — emits a [`tracing`] span on every stage execution.
+//! - [`deadline::Deadline`] — returns an error if a stage exceeds a time budget.
+//!
+//! # Pooling
+//!
+//! [`pool::PipelinePool`] manages a fixed-capacity stock of pre-built pipelines
+//! for concurrent workloads. Callers acquire a [`pool::PoolGuard`] (which derefs
+//! to the pipeline), and on drop the scratchpad is reset and the pipeline is
+//! returned for the next caller.
 //!
 //! # Example
 //!
@@ -62,6 +70,7 @@ pub mod dynamic_pipeline;
 pub mod error;
 pub mod instrument;
 pub mod metrics;
+pub mod pool;
 pub mod retry;
 pub mod scratchpad;
 pub mod stage;
