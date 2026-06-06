@@ -3,7 +3,7 @@
 A zero-allocation pipeline executor for deterministic workloads in Rust.
 
 Individual pipeline stages transform a shared scratchpad in sequence. The pipeline owns no data and never touches the allocator on the execution path. No scheduler, no async runtime, and no hidden overhead. Designed for domains where performance and low latency are a priority, such as ML inference, robotics, signal processing, real-time control, and embedded systems.
-ca
+
 ---
 
 ## Install
