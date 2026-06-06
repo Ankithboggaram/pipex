@@ -12,7 +12,7 @@
 //! use pipex::stage::Stage;
 //! use pipex::scratchpad::Scratchpad;
 //! use pipex::error::PipelineError;
-//! use pipex::metrics::{StageMetrics, Timed};
+//! use pipex::metrics::Timed;
 //!
 //! struct Buf {
 //!     value: f32,
@@ -41,8 +41,8 @@
 //!     }
 //! }
 //!
-//! let metrics = StageMetrics::new("double");
-//! let mut pipeline = (Double, Timed::new(Clamp, metrics));
+//! let (clamp, _clamp_metrics) = Timed::new(Clamp);
+//! let mut pipeline = (Double, clamp);
 //! let mut ctx = Buf { value: 3.0 };
 //! pipeline.run(&mut ctx).unwrap();
 //! ```

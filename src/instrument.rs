@@ -135,15 +135,13 @@ mod tests {
 
     #[test]
     fn instrumented_and_timed_can_compose() {
-        use crate::metrics::{StageMetrics, Timed};
-        use std::sync::Arc;
+        use crate::metrics::Timed;
 
-        let metrics = StageMetrics::new("noop");
-        let mut stage = Timed::new(Instrumented::new(NoopStage), Arc::clone(&metrics));
+        let (mut stage, noop_metrics) = Timed::new(Instrumented::new(NoopStage));
         let mut ctx = TestScratchpad;
 
         stage.run(&mut ctx).unwrap();
 
-        assert_eq!(metrics.snapshot().count, 1);
+        assert_eq!(noop_metrics.snapshot().count, 1);
     }
 }

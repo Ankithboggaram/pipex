@@ -118,19 +118,21 @@ pipeline.run(&mut ctx).unwrap();
 | Wrapper | What it does |
 |---|---|
 | `Retry::new(stage, n)` | Retry on failure; restores scratchpad state between attempts |
-| `Timed::new(stage, metrics)` | Lock-free nanosecond timing with rolling percentiles |
+| `Timed::new(stage)` | Lock-free nanosecond timing with rolling percentiles; label derived from stage name |
 | `Instrumented::new(stage)` | Emit a [`tracing`](https://docs.rs/tracing) span per execution |
 | `Deadline::new(stage, duration)` | Fail if stage exceeds its time budget |
 
 Wrappers are stages and compose freely as tuple elements:
 
 ```rust
-use pipex::metrics::{StageMetrics, Timed};
+use pipex::metrics::Timed;
 use pipex::retry::Retry;
 
-let metrics = StageMetrics::new("clamp");
-let mut pipeline = (Normalise, Timed::new(Clamp, metrics), Retry::new(Clamp, 3));
+// Timed::new returns the wrapper and its metrics collector together.
+let (clamp, clamp_metrics) = Timed::new(Clamp);
+let mut pipeline = (Normalise, Retry::new(clamp, 3));
 pipeline.run(&mut ctx).unwrap();
+// clamp_metrics.snapshot() has timing data for Clamp across all runs
 ```
 
 ---
@@ -151,7 +153,7 @@ There are three models. The right choice depends on whether you need sharing acr
 
 **Use the static pipeline** when throughput is the priority and a single pipeline instance must be shared across many threads via `Arc`. You give up wrappers and per-stage metrics. Measure latency outside the pipeline if needed.
 
-**Use a tuple chain** when you need wrappers or per-stage timing and each thread owns its pipeline. All stage state is inline — no heap allocation, no dynamic dispatch. This is the right model for most single-threaded or per-thread workloads.
+**Use a tuple chain** when you need wrappers or per-stage timing and each thread owns its pipeline. All stage state is inline: no heap allocation, no dynamic dispatch. This is the right model for most single-threaded or per-thread workloads.
 
 **Use the dynamic pipeline** when the pipeline is assembled at runtime — plugin systems, config-driven pipelines, or test harnesses where stage types vary.
 
@@ -168,7 +170,7 @@ Measured on Apple Silicon using [divan](https://github.com/nvzqz/divan). All tim
 | 1,000,000 | 224 µs | 210 µs | 211 µs | 209 µs |
 
 - Static pipeline matches hand-written sequential calls at every data size.
-- `Timed` adds ~50 ns per stage (one clock read each side). At small data sizes this dominates; at 10,000+ elements it is unmeasurable against the actual work.
+- `Timed` adds ~50 ns per stage (one `Instant::now()` read each side). At small data sizes this dominates; at 10,000+ elements it is unmeasurable against the actual work.
 - Pool acquire+run+return (~1.3 µs) vs. allocating a new scratchpad per call (~3.3 µs): ~2.5x faster under load.
 
 ---

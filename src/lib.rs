@@ -57,7 +57,7 @@
 //! - **Tuple chain** ([`chain`]) : a tuple of stages is itself a [`Stage<S>`][stage::Stage].
 //!   All stage state is stored inline with no heap allocation and no capacity constant.
 //!   Wrappers compose naturally as tuple elements:
-//!   `(Normalise, Timed::new(Clamp, metrics), Retry::new(Scale, 3))`.
+//!   `let (clamp, clamp_metrics) = Timed::new(Clamp);` then `(Normalise, Retry::new(clamp, 3))`.
 //!
 //! All three borrow the scratchpad at run time: `pipeline.run(&mut ctx)`.
 //!

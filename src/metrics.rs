@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::Instant;
 
 use crate::error::PipelineError;
 use crate::scratchpad::Scratchpad;
@@ -37,8 +37,6 @@ pub struct StageSnapshot {
     pub p99_ns: u64,
     /// 99.9th-percentile duration from the rolling window, in nanoseconds.
     pub p999_ns: u64,
-    /// Unix timestamp of the last execution, in nanoseconds since the Unix epoch.
-    pub last_updated_ns: u64,
 }
 
 impl std::fmt::Display for StageSnapshot {
@@ -46,6 +44,10 @@ impl std::fmt::Display for StageSnapshot {
         let status = if self.error_count == 0 { "OK" } else { "ERR" };
         writeln!(f, "[{}] {}", status, self.label)?;
         writeln!(f, "  Count:              {}", self.count)?;
+        writeln!(f, "  Last:               {}ns", self.last_ns)?;
+        writeln!(f, "  Min:                {}ns", self.min_ns)?;
+        writeln!(f, "  Max:                {}ns", self.max_ns)?;
+        writeln!(f, "  Mean:               {}ns", self.mean_ns)?;
         writeln!(f, "  50th Percentile:    {}ns", self.p50_ns)?;
         writeln!(f, "  95th Percentile:    {}ns", self.p95_ns)?;
         writeln!(f, "  99th Percentile:    {}ns", self.p99_ns)?;
@@ -93,7 +95,6 @@ pub struct StageMetrics {
     min_ns: AtomicU64,
     max_ns: AtomicU64,
     last_ns: AtomicU64,
-    last_updated_ns: AtomicU64,
     window: [AtomicU64; WINDOW_SIZE],
     window_pos: AtomicUsize,
 }
@@ -110,7 +111,6 @@ impl StageMetrics {
             min_ns: AtomicU64::new(u64::MAX),
             max_ns: AtomicU64::new(0),
             last_ns: AtomicU64::new(0),
-            last_updated_ns: AtomicU64::new(0),
             window: std::array::from_fn(|_| AtomicU64::new(0)),
             window_pos: AtomicUsize::new(0),
         })
@@ -129,12 +129,6 @@ impl StageMetrics {
 
         let pos = self.window_pos.fetch_add(1, Ordering::Relaxed) % WINDOW_SIZE;
         self.window[pos].store(duration_ns, Ordering::Relaxed);
-
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as u64;
-        self.last_updated_ns.store(now, Ordering::Relaxed);
     }
 
     /// Returns a point-in-time snapshot of all current metrics.
@@ -164,10 +158,10 @@ impl StageMetrics {
                 .collect();
             samples.sort_unstable();
             (
-                percentile(&samples, 50),
-                percentile(&samples, 95),
-                percentile(&samples, 99),
-                percentile_f(&samples, 99.9),
+                percentile(&samples, 50.0),
+                percentile(&samples, 95.0),
+                percentile(&samples, 99.0),
+                percentile(&samples, 99.9),
             )
         };
 
@@ -184,21 +178,23 @@ impl StageMetrics {
             p95_ns,
             p99_ns,
             p999_ns,
-            last_updated_ns: self.last_updated_ns.load(Ordering::Relaxed),
         }
     }
 }
 
-/// Wraps a stage with nanosecond timing, recording to a `StageMetrics` instance.
+/// Wraps a stage with nanosecond timing, recording to a [`StageMetrics`] instance.
+///
+/// The metrics label is derived automatically from [`Stage::name`]. Retrieve the
+/// [`StageMetrics`] after construction via [`metrics`][Timed::metrics], then
+/// register with [`PipelineMetrics`] if needed.
 ///
 /// # Example
 /// ```
-/// use pipex::metrics::{StageMetrics, Timed};
+/// use pipex::metrics::Timed;
 /// use pipex::stage::Stage;
 /// use pipex::scratchpad::Scratchpad;
 /// use pipex::error::PipelineError;
 /// use pipex::dynamic_pipeline::Pipeline;
-/// use std::sync::Arc;
 ///
 /// struct MyScratchpad;
 ///
@@ -214,9 +210,11 @@ impl StageMetrics {
 ///     }
 /// }
 ///
-/// let metrics = StageMetrics::new("my_stage");
-/// let mut pipeline = Pipeline::new().stage(Timed::new(MyStage, Arc::clone(&metrics)));
+/// let (my_stage, my_stage_metrics) = Timed::new(MyStage);
+/// let mut pipeline = Pipeline::new().stage(my_stage);
 /// let mut ctx = MyScratchpad;
+/// pipeline.run(&mut ctx).unwrap();
+/// assert_eq!(my_stage_metrics.snapshot().count, 1);
 /// ```
 #[derive(Debug)]
 pub struct Timed<S: Scratchpad, T: Stage<S>> {
@@ -226,14 +224,31 @@ pub struct Timed<S: Scratchpad, T: Stage<S>> {
 }
 
 impl<S: Scratchpad, T: Stage<S>> Timed<S, T> {
-    /// Creates a new `Timed` wrapper around a stage.
+    /// Wraps `stage` with timing, returning the wrapper and its metrics collector.
+    ///
+    /// The metrics label is derived from [`Stage::name`], which defaults to the
+    /// fully qualified type name. Override [`Stage::name`] on your stage type to
+    /// use a shorter label.
+    ///
+    /// ```
+    /// # use pipex::metrics::Timed;
+    /// # use pipex::stage::Stage;
+    /// # use pipex::scratchpad::Scratchpad;
+    /// # use pipex::error::PipelineError;
+    /// # struct S; impl Scratchpad for S { fn reset(&mut self) {} }
+    /// # struct MyStage; impl Stage<S> for MyStage { fn run(&mut self, _: &mut S) -> Result<(), PipelineError> { Ok(()) } }
+    /// let (my_stage, my_stage_metrics) = Timed::new(MyStage);
+    /// ```
     #[must_use]
-    pub fn new(stage: T, metrics: Arc<StageMetrics>) -> Self {
-        Self {
+    pub fn new(stage: T) -> (Self, Arc<StageMetrics>) {
+        let name = stage.name();
+        let metrics = StageMetrics::new(name);
+        let wrapper = Self {
             stage,
-            metrics,
+            metrics: Arc::clone(&metrics),
             _marker: std::marker::PhantomData,
-        }
+        };
+        (wrapper, metrics)
     }
 }
 
@@ -333,8 +348,10 @@ impl std::fmt::Display for PipelineSnapshot {
 /// }
 ///
 /// let mut pm = PipelineMetrics::new();
+/// let (noop, noop_metrics) = Timed::new(NoopStage);
+/// pm.register(noop_metrics);
 ///
-/// let mut pipeline = Pipeline::new().stage(Timed::new(NoopStage, pm.track("noop")));
+/// let mut pipeline = Pipeline::new().stage(noop);
 /// let mut ctx = MyScratchpad;
 /// pipeline.run(&mut ctx).unwrap();
 ///
@@ -354,12 +371,38 @@ impl PipelineMetrics {
         Self::default()
     }
 
-    /// Creates a new [`StageMetrics`] with the given label, registers it for
-    /// tracking, and returns an `Arc` suitable for passing to [`Timed::new`].
-    pub fn track(&mut self, label: impl Into<String>) -> Arc<StageMetrics> {
-        let m = StageMetrics::new(label);
-        self.metrics.push(Arc::clone(&m));
-        m
+    /// Registers a pre-existing [`StageMetrics`] for tracking.
+    ///
+    /// Use this with [`Timed::tracked`] to derive the label automatically and
+    /// still include the stage in a [`PipelineSnapshot`]:
+    ///
+    /// ```
+    /// use pipex::metrics::{PipelineMetrics, Timed};
+    /// use pipex::stage::Stage;
+    /// use pipex::scratchpad::Scratchpad;
+    /// use pipex::error::PipelineError;
+    /// use pipex::dynamic_pipeline::Pipeline;
+    ///
+    /// struct MyScratchpad;
+    /// impl Scratchpad for MyScratchpad {
+    ///     fn reset(&mut self) {}
+    /// }
+    ///
+    /// struct MyStage;
+    /// impl Stage<MyScratchpad> for MyStage {
+    ///     fn run(&mut self, _ctx: &mut MyScratchpad) -> Result<(), PipelineError> { Ok(()) }
+    /// }
+    ///
+    /// let mut pm = PipelineMetrics::new();
+    /// let (my_stage, my_stage_metrics) = Timed::new(MyStage);
+    /// pm.register(my_stage_metrics);
+    /// let mut pipeline = Pipeline::new().stage(my_stage);
+    /// let mut ctx = MyScratchpad;
+    /// pipeline.run(&mut ctx).unwrap();
+    /// assert_eq!(pm.snapshot().total_count(), 1);
+    /// ```
+    pub fn register(&mut self, metrics: Arc<StageMetrics>) {
+        self.metrics.push(metrics);
     }
 
     /// Returns a point-in-time snapshot of all tracked stages.
@@ -371,15 +414,7 @@ impl PipelineMetrics {
     }
 }
 
-fn percentile(sorted: &[u64], p: usize) -> u64 {
-    if sorted.is_empty() {
-        return 0;
-    }
-    let idx = (p * sorted.len() / 100).min(sorted.len() - 1);
-    sorted[idx]
-}
-
-fn percentile_f(sorted: &[u64], p: f64) -> u64 {
+fn percentile(sorted: &[u64], p: f64) -> u64 {
     if sorted.is_empty() {
         return 0;
     }
@@ -418,36 +453,33 @@ mod tests {
 
     #[test]
     fn records_execution_count() {
-        let metrics = StageMetrics::new("test");
-        let mut stage = Timed::new(NoopStage, Arc::clone(&metrics));
+        let (mut stage, noop_metrics) = Timed::new(NoopStage);
         let mut ctx = TestScratchpad;
 
         for _ in 0..10 {
             stage.run(&mut ctx).unwrap();
         }
 
-        assert_eq!(metrics.snapshot().count, 10);
+        assert_eq!(noop_metrics.snapshot().count, 10);
     }
 
     #[test]
     fn records_error_count() {
-        let metrics = StageMetrics::new("test");
-        let mut stage = Timed::new(FailStage, Arc::clone(&metrics));
+        let (mut stage, fail_metrics) = Timed::new(FailStage);
         let mut ctx = TestScratchpad;
 
         for _ in 0..5 {
             stage.run(&mut ctx).ok();
         }
 
-        let snapshot = metrics.snapshot();
+        let snapshot = fail_metrics.snapshot();
         assert_eq!(snapshot.error_count, 5);
         assert!((snapshot.error_rate - 1.0).abs() < f64::EPSILON);
     }
 
     #[test]
     fn error_propagates_through_timed_wrapper() {
-        let metrics = StageMetrics::new("test");
-        let mut stage = Timed::new(FailStage, Arc::clone(&metrics));
+        let (mut stage, _) = Timed::new(FailStage);
         let mut ctx = TestScratchpad;
 
         assert!(matches!(
@@ -458,61 +490,57 @@ mod tests {
 
     #[test]
     fn min_is_less_than_or_equal_to_max() {
-        let metrics = StageMetrics::new("test");
-        let mut stage = Timed::new(NoopStage, Arc::clone(&metrics));
+        let (mut stage, noop_metrics) = Timed::new(NoopStage);
         let mut ctx = TestScratchpad;
 
         for _ in 0..100 {
             stage.run(&mut ctx).unwrap();
         }
 
-        let snapshot = metrics.snapshot();
+        let snapshot = noop_metrics.snapshot();
         assert!(snapshot.min_ns <= snapshot.max_ns);
     }
 
     #[test]
     fn percentiles_are_ordered() {
-        let metrics = StageMetrics::new("test");
-        let mut stage = Timed::new(NoopStage, Arc::clone(&metrics));
+        let (mut stage, noop_metrics) = Timed::new(NoopStage);
         let mut ctx = TestScratchpad;
 
         for _ in 0..200 {
             stage.run(&mut ctx).unwrap();
         }
 
-        let s = metrics.snapshot();
+        let s = noop_metrics.snapshot();
         assert!(s.p50_ns <= s.p95_ns);
         assert!(s.p95_ns <= s.p99_ns);
         assert!(s.p99_ns <= s.p999_ns);
     }
 
     #[test]
-    fn last_updated_ns_is_set_after_execution() {
-        let metrics = StageMetrics::new("test");
-        let mut stage = Timed::new(NoopStage, Arc::clone(&metrics));
-        let mut ctx = TestScratchpad;
-
-        stage.run(&mut ctx).unwrap();
-
-        assert!(metrics.snapshot().last_updated_ns > 0);
-    }
-
-    #[test]
     fn mixed_success_and_failure_error_rate() {
-        let metrics = StageMetrics::new("test");
+        struct SometimesFailStage(u32);
+        impl Stage<TestScratchpad> for SometimesFailStage {
+            fn run(&mut self, _ctx: &mut TestScratchpad) -> Result<(), PipelineError> {
+                self.0 += 1;
+                if self.0 % 4 == 0 {
+                    Err(PipelineError::StageFailed {
+                        stage: "SometimesFailStage",
+                        message: String::from("scheduled"),
+                    })
+                } else {
+                    Ok(())
+                }
+            }
+        }
+
+        let (mut stage, sometimes_metrics) = Timed::new(SometimesFailStage(0));
         let mut ctx = TestScratchpad;
 
-        let mut success_stage = Timed::new(NoopStage, Arc::clone(&metrics));
-        let mut fail_stage = Timed::new(FailStage, Arc::clone(&metrics));
-
-        for _ in 0..3 {
-            success_stage.run(&mut ctx).unwrap();
-        }
-        for _ in 0..1 {
-            fail_stage.run(&mut ctx).ok();
+        for _ in 0..4 {
+            stage.run(&mut ctx).ok();
         }
 
-        let snapshot = metrics.snapshot();
+        let snapshot = sometimes_metrics.snapshot();
         assert_eq!(snapshot.count, 4);
         assert_eq!(snapshot.error_count, 1);
         assert!((snapshot.error_rate - 0.25).abs() < 1e-9);

@@ -3,13 +3,12 @@ use pipex::deadline::Deadline;
 use pipex::dynamic_pipeline::Pipeline as DynamicPipeline;
 use pipex::error::PipelineError;
 use pipex::instrument::Instrumented;
-use pipex::metrics::{StageMetrics, Timed};
+use pipex::metrics::Timed;
 use pipex::pool::ScratchpadPool;
 use pipex::retry::Retry;
 use pipex::scratchpad::Scratchpad;
 use pipex::stage::Stage;
 use pipex::static_pipeline::Pipeline as StaticPipeline;
-use std::sync::Arc;
 use std::time::Duration;
 
 fn main() {
@@ -397,9 +396,8 @@ mod instrumentation_overhead {
 
     #[divan::bench]
     fn timed_stage(bencher: Bencher) {
-        let metrics = StageMetrics::new("normalise");
-        let mut pipeline =
-            DynamicPipeline::new().stage(Timed::new(NormaliseStage, Arc::clone(&metrics)));
+        let (normalise_timed, _normalise_metrics) = Timed::new(NormaliseStage);
+        let mut pipeline = DynamicPipeline::new().stage(normalise_timed);
         let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {
@@ -421,11 +419,8 @@ mod instrumentation_overhead {
 
     #[divan::bench]
     fn timed_and_instrumented_stage(bencher: Bencher) {
-        let metrics = StageMetrics::new("normalise");
-        let mut pipeline = DynamicPipeline::new().stage(Timed::new(
-            Instrumented::new(NormaliseStage),
-            Arc::clone(&metrics),
-        ));
+        let (normalise_timed, _normalise_metrics) = Timed::new(Instrumented::new(NormaliseStage));
+        let mut pipeline = DynamicPipeline::new().stage(normalise_timed);
         let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {
@@ -502,13 +497,13 @@ mod sequential_comparison {
     // pipex static + per-stage timing — cost of full observability on the hot path.
     #[divan::bench(args = [100, 10_000, 1_000_000])]
     fn pipex_static_timed(bencher: Bencher, size: usize) {
-        let m1 = StageMetrics::new("normalise");
-        let m2 = StageMetrics::new("clamp");
-        let m3 = StageMetrics::new("scale");
+        let (normalise_timed, _normalise_metrics) = Timed::new(NormaliseStage);
+        let (clamp_timed, _clamp_metrics) = Timed::new(ClampStage);
+        let (scale_timed, _scale_metrics) = Timed::new(ScaleStage);
         let mut pipeline = DynamicPipeline::new()
-            .stage(Timed::new(NormaliseStage, Arc::clone(&m1)))
-            .stage(Timed::new(ClampStage, Arc::clone(&m2)))
-            .stage(Timed::new(ScaleStage, Arc::clone(&m3)));
+            .stage(normalise_timed)
+            .stage(clamp_timed)
+            .stage(scale_timed);
         let mut ctx = BenchScratchpad::new(size);
 
         bencher.bench_local(|| {

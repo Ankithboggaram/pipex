@@ -309,9 +309,11 @@ mod pipeline_metrics_tests {
     #[test]
     fn tracks_execution_count_across_stages() {
         let mut pm = PipelineMetrics::new();
-        let mut pipeline = DynamicPipeline::new()
-            .stage(Timed::new(NormaliseStage, pm.track("normalise")))
-            .stage(Timed::new(ClampStage, pm.track("clamp")));
+        let (t1, m1) = Timed::new(NormaliseStage);
+        let (t2, m2) = Timed::new(ClampStage);
+        pm.register(m1);
+        pm.register(m2);
+        let mut pipeline = DynamicPipeline::new().stage(t1).stage(t2);
         let mut ctx = MlScratchpad::new(vec![1.0, 2.0, 4.0]);
         pipeline.run(&mut ctx).unwrap();
 
@@ -325,9 +327,11 @@ mod pipeline_metrics_tests {
     #[test]
     fn snapshot_identifies_slowest_stage() {
         let mut pm = PipelineMetrics::new();
-        let mut pipeline = DynamicPipeline::new()
-            .stage(Timed::new(NormaliseStage, pm.track("normalise")))
-            .stage(Timed::new(ClampStage, pm.track("clamp")));
+        let (t1, m1) = Timed::new(NormaliseStage);
+        let (t2, m2) = Timed::new(ClampStage);
+        pm.register(m1);
+        pm.register(m2);
+        let mut pipeline = DynamicPipeline::new().stage(t1).stage(t2);
         let mut ctx = MlScratchpad::new(vec![1.0, 2.0, 4.0]);
         for _ in 0..10 {
             ctx.reset();
@@ -340,22 +344,23 @@ mod pipeline_metrics_tests {
     #[test]
     fn error_stages_filters_correctly() {
         let mut pm = PipelineMetrics::new();
-        let normalise_m = pm.track("normalise");
-        let fail_m = pm.track("always_fail");
+        let (t1, m1) = Timed::new(NormaliseStage);
+        let (t2, m2) = Timed::new(AlwaysFailStage);
+        pm.register(m1);
+        pm.register(m2);
 
-        let mut pipeline =
-            DynamicPipeline::new().stage(Timed::new(NormaliseStage, Arc::clone(&normalise_m)));
+        let mut pipeline = DynamicPipeline::new().stage(t1);
         let mut ctx = MlScratchpad::new(vec![1.0, 2.0, 4.0]);
         pipeline.run(&mut ctx).unwrap();
 
-        let mut fail_stage = Timed::new(AlwaysFailStage, Arc::clone(&fail_m));
+        let mut fail_stage = t2;
         let mut ctx2 = MlScratchpad::new(vec![1.0]);
         fail_stage.run(&mut ctx2).ok();
 
         let snapshot = pm.snapshot();
         let errored: Vec<_> = snapshot.error_stages().collect();
         assert_eq!(errored.len(), 1);
-        assert_eq!(errored[0].label, "always_fail");
+        assert!(errored[0].label.contains("AlwaysFailStage"));
     }
 }
 
