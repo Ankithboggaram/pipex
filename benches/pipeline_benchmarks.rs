@@ -370,7 +370,7 @@ mod pool_overhead {
     }
 
     /// Acquires a pre-built scratchpad from the pool and returns it on drop.
-    /// No allocation on the hot path — Vec buffers are reused.
+    /// No allocation on the hot path; Vec buffers are reused.
     #[divan::bench]
     fn pool_acquire_run_return(bencher: Bencher) {
         let pipeline = make_static_pipeline();

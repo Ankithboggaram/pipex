@@ -13,7 +13,7 @@ use crate::stage::Stage;
 /// alternative with stages known at compile time, see
 /// [`static_pipeline::Pipeline`][crate::static_pipeline::Pipeline].
 ///
-/// The pipeline holds no data — stages are run by passing a mutable scratchpad
+/// The pipeline holds no data; stages are run by passing a mutable scratchpad
 /// reference to [`run`][Pipeline::run].
 ///
 /// # Example

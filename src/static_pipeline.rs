@@ -11,7 +11,7 @@ type StageFn<S> = fn(&mut S) -> Result<(), PipelineError>;
 /// allocation occurs after initialisation. The number of stages `N` must be
 /// known at compile time.
 ///
-/// The pipeline holds no data — stages are run by passing a mutable scratchpad
+/// The pipeline holds no data; stages are run by passing a mutable scratchpad
 /// reference to [`run`][Pipeline::run]. Because the pipeline has no mutable
 /// state after setup, `run` takes `&self`, allowing a single pipeline to be
 /// shared across threads via [`Arc`] while each thread supplies its own

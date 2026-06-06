@@ -2,7 +2,7 @@
 //!
 //! With pipelines decoupled from their scratchpad, the typical concurrent
 //! pattern is to share a single [`static_pipeline::Pipeline`] via [`Arc`] and
-//! pool only the scratchpads — one per concurrent caller.
+//! pool only the scratchpads, one per concurrent caller.
 //!
 //! # Example
 //!

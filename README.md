@@ -1,6 +1,6 @@
 # pipex
 
-A high-performance, zero-allocation pipeline execution library for Rust. Stages operate on a shared pre-allocated scratchpad buffer; no heap allocation occurs on the execution hot path.
+pipex is a zero-allocation stage executor for deterministic workloads. Stages transform a shared scratchpad buffer in sequence: data lives in the scratchpad, and the pipeline is reusable logic.
 
 ---
 
@@ -14,8 +14,6 @@ pipex = { git = "https://github.com/Ankithboggaram/pipex" }
 ---
 
 ## Quick start
-
-Define a scratchpad, implement stages, run.
 
 ```rust
 use pipex::scratchpad::Scratchpad;
@@ -54,7 +52,7 @@ assert_eq!(ctx.value, 6.0);
 Two pipeline variants:
 
 - **Dynamic** (`dynamic_pipeline::Pipeline`): stages as `Box<dyn Stage<S>>`, configured at runtime.
-- **Static** (`static_pipeline::Pipeline<S, N>`): stages as function pointers in a fixed array, zero allocation after setup. Takes `&self` on `run` — share one instance across threads via `Arc`.
+- **Static** (`static_pipeline::Pipeline<S, N>`): stages as function pointers in a fixed array, zero allocation after setup. Takes `&self` on `run`. Shareable across threads via `Arc`.
 
 ---
 
@@ -67,17 +65,18 @@ Two pipeline variants:
 | `Instrumented::new(stage, name)` | Emit a [`tracing`](https://docs.rs/tracing) span on every execution |
 | `Deadline::new(stage, duration)` | Return `DeadlineExceeded` if the stage exceeds its time budget |
 
-All wrappers compose: `Timed::new(Instrumented::new(stage, "name"), metrics)`.
+Wrappers are composable: `Timed::new(Instrumented::new(stage, "name"), metrics)`.
 
-Use `PipelineMetrics` to aggregate snapshots across all stages in one call:
+`PipelineMetrics` aggregates timing snapshots across all stages in one call:
 
 ```rust
+// Buf and Double are defined in Quick start above.
 let mut pm = PipelineMetrics::new();
-let mut pipeline = Pipeline::new(ctx)
-    .stage(Timed::new(StageA, pm.track("a")))
-    .stage(Timed::new(StageB, pm.track("b")));
-
-pipeline.run().unwrap();
+let mut pipeline = Pipeline::new()
+    .stage(Timed::new(Double, pm.track("double-1")))
+    .stage(Timed::new(Double, pm.track("double-2")));
+let mut ctx = Buf { value: 1.0 };
+pipeline.run(&mut ctx).unwrap();
 let snapshot = pm.snapshot();
 ```
 
@@ -85,21 +84,28 @@ let snapshot = pm.snapshot();
 
 ## Pooling
 
-The static pipeline is stateless after setup, so a single `Arc<Pipeline>` can be shared across all threads. Pool only the scratchpads — one per concurrent caller.
+The static pipeline is stateless after setup, so a single `Arc<Pipeline>` can be shared across all threads. One scratchpad per concurrent caller is sufficient.
 
-The factory closure is called once per slot at startup (and on demand if all scratchpads are in use). `acquire()` checks out a scratchpad; dropping the guard resets it and returns it to the pool.
+The factory closure is called once per slot at startup (and on demand if all scratchpads are in use). `acquire()` borrows a scratchpad from the pool; dropping the guard resets it and returns it.
 
 ```rust
 use std::sync::Arc;
 use pipex::pool::ScratchpadPool;
 use pipex::static_pipeline::Pipeline;
+use pipex::error::PipelineError;
+
+// Buf is defined in Quick start above.
+fn double(ctx: &mut Buf) -> Result<(), PipelineError> {
+    ctx.value *= 2.0;
+    Ok(())
+}
 
 // One pipeline shared across all threads.
 let mut pipeline = Pipeline::<Buf, 1>::new();
 pipeline.add_stage(double).unwrap();
 let pipeline = Arc::new(pipeline);
 
-// Pool of scratchpads — one per concurrent caller.
+// Pool of scratchpads, one per concurrent caller.
 let pool = Arc::new(ScratchpadPool::new(4, || Buf { value: 0.0 }));
 
 // Spawn 8 threads, each borrowing a scratchpad from the pool.
@@ -107,14 +113,30 @@ for _ in 0..8 {
     let pipeline = Arc::clone(&pipeline);
     let pool = Arc::clone(&pool);
     std::thread::spawn(move || {
-        let mut ctx = pool.acquire();  // borrows a scratchpad
-        ctx.value = 3.0;              // write input
+        let mut ctx = pool.acquire();
+        ctx.value = 3.0;
         pipeline.run(&mut ctx).unwrap();
         assert_eq!(ctx.value, 6.0);
         // ctx drops here → scratchpad reset → returned to pool
     });
 }
 ```
+
+---
+
+## Design
+
+Seven principles:
+
+1. **Scratchpad is the execution state.** All inter-stage data lives in the scratchpad. Nothing is allocated or moved between stages.
+2. **Pipeline and scratchpad are decoupled.** The pipeline borrows your data at run time. Neither owns the other.
+3. **The execution path allocates nothing.** Guaranteed by the zero-allocation design and verified by the test suite.
+4. **Execution is deterministic and linear.** Fixed order, calling thread, no scheduler.
+5. **Wrappers are independent decorators.** `Retry`, `Timed`, `Instrumented`, and `Deadline` are each implemented independently and compose in any order.
+6. **Observability is first-class.** Per-stage timing, percentiles, and tracing are core types, not plugins.
+7. **No macros required.** Plain `impl` blocks throughout.
+
+**Not in scope:** async execution, DAG execution, workflow engines, distributed scheduling.
 
 ---
 
@@ -146,5 +168,3 @@ Measured on Apple Silicon using [divan](https://github.com/nvzqz/divan). All tim
 ## Roadmap
 
 - [ ] Type chaining for full compiler inlining across stage boundaries
-- [ ] Parallel stage execution
-- [ ] Arena allocation
