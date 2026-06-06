@@ -33,7 +33,7 @@ pub trait Stage<S: Scratchpad>: Send {
     /// Returns the name of this stage.
     ///
     /// Defaults to the fully qualified type name (e.g. `"mycrate::stages::Normalise"`).
-    /// Override to provide a shorter, human-readable label — useful for error messages,
+    /// Override to provide a shorter, human-readable label, useful for error messages,
     /// metrics labels, and tracing spans.
     fn name(&self) -> &'static str {
         std::any::type_name::<Self>()

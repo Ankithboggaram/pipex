@@ -7,7 +7,7 @@ use crate::stage::Stage;
 /// Wraps a stage with a tracing span, emitting structured observability
 /// data on every execution.
 ///
-/// The span name is derived from [`Stage::name`] — override that method on
+/// The span name is derived from [`Stage::name`]; override that method on
 /// your stage type to customise it. No explicit name is required at
 /// construction time.
 ///
@@ -49,8 +49,8 @@ pub struct Instrumented<S: Scratchpad, T: Stage<S>> {
 impl<S: Scratchpad, T: Stage<S>> Instrumented<S, T> {
     /// Wraps `stage` in a tracing span.
     ///
-    /// The span name comes from [`Stage::name`] on the inner stage —
-    /// override it there if you need a custom label.
+    /// The span name comes from [`Stage::name`] on the inner stage.
+    /// Override it there if you need a custom label.
     #[must_use]
     pub fn new(stage: T) -> Self {
         Self {

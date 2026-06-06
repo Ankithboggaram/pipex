@@ -64,6 +64,9 @@ fn scale(ctx: &mut ZeroAllocScratchpad) -> Result<(), PipelineError> {
     Ok(())
 }
 
+// Retry is intentionally absent from these tests. It clones the scratchpad
+// before each attempt (for state restoration on failure), which allocates for
+// heap-bearing scratchpads. See the Retry doc comment for details.
 mod zero_alloc_tests {
     use super::*;
 

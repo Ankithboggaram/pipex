@@ -128,7 +128,7 @@ Seven principles:
 
 1. **Scratchpad is the execution state.** All inter-stage data lives in the scratchpad. Nothing is allocated or moved between stages.
 2. **Pipeline and scratchpad are decoupled.** The pipeline borrows your data at run time. Neither owns the other.
-3. **The execution path allocates nothing.** Guaranteed by the zero-allocation design and verified by the test suite.
+3. **The execution path allocates nothing.** Both pipeline variants and the `Timed`, `Instrumented`, and `Deadline` wrappers are allocation-free during `run()`. Verified by the test suite. `Retry` is the sole exception: it clones the scratchpad before each attempt and should not be used on zero-allocation hot paths.
 4. **Execution is deterministic and linear.** Fixed order, calling thread, no scheduler.
 5. **Wrappers are independent decorators.** `Retry`, `Timed`, `Instrumented`, and `Deadline` are each implemented independently and compose in any order.
 6. **Observability is first-class.** Per-stage timing, percentiles, and tracing are core types, not plugins.

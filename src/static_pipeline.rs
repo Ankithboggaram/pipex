@@ -108,7 +108,7 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
 
     /// Validates the pipeline's stage configuration with a user-provided closure.
     ///
-    /// Receives `&self.stages[..count]` — a slice of `Option<StageFn<S>>` with no
+    /// Receives `&self.stages[..count]`, a slice of `Option<StageFn<S>>` with no
     /// intermediate allocation. Every entry in the slice is `Some`; the `Option`
     /// wrapper is a consequence of the fixed-size backing array.
     ///

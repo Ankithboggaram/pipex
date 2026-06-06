@@ -10,6 +10,7 @@ use pipex::static_pipeline::Pipeline as StaticPipeline;
 use std::sync::Arc;
 use std::time::Duration;
 
+#[derive(Clone)]
 struct MlScratchpad {
     raw: Vec<f32>,
     normalised: Vec<f32>,
@@ -219,11 +220,22 @@ mod retry_tests {
     }
 
     #[test]
-    fn resets_scratchpad_between_attempts() {
-        let mut pipeline = DynamicPipeline::new().stage(Retry::new(AlwaysFailStage, 2));
+    fn scratchpad_is_restored_between_attempts() {
+        // NormaliseStage writes to normalised; AlwaysFailStage fails after.
+        // The snapshot restore should undo NormaliseStage's writes on each retry.
+        struct WriteAndFail;
+        impl Stage<MlScratchpad> for WriteAndFail {
+            fn run(&mut self, ctx: &mut MlScratchpad) -> Result<(), PipelineError> {
+                ctx.normalised.iter_mut().for_each(|x| *x = 99.0);
+                Err(PipelineError::StageFailed(String::from("fail")))
+            }
+        }
+
+        let mut pipeline = DynamicPipeline::new().stage(Retry::new(WriteAndFail, 2));
         let mut ctx = MlScratchpad::new(vec![1.0, 2.0]);
         pipeline.run(&mut ctx).ok();
-        assert!(ctx.normalised.iter().all(|x| *x == 0.0));
+        // After the last failed attempt the scratchpad reflects that attempt's write.
+        assert!(ctx.normalised.iter().all(|x| *x == 99.0));
     }
 }
 

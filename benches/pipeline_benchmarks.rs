@@ -16,6 +16,7 @@ fn main() {
     divan::main();
 }
 
+#[derive(Clone)]
 struct BenchScratchpad {
     input: Vec<f32>,
     output: Vec<f32>,

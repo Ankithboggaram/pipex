@@ -17,7 +17,12 @@
 //!    never owns data. Either can be created, pooled, or discarded independently.
 //!
 //! 3. **The execution path allocates nothing.** Neither pipeline variant calls the
-//!    allocator during `run()`. This is a hard guarantee verified by the test suite.
+//!    allocator during `run()`, and neither do [`metrics::Timed`],
+//!    [`instrument::Instrumented`], or [`deadline::Deadline`]. This is a hard
+//!    guarantee verified by the test suite. [`retry::Retry`] is the sole
+//!    exception: it clones the scratchpad before each attempt to restore state on
+//!    failure, which allocates if the scratchpad contains heap data. `Retry` is an
+//!    error-recovery wrapper and should not appear on a zero-allocation hot path.
 //!
 //! 4. **Execution is deterministic and linear.** Stages run in the order they were
 //!    added, on the thread that calls `run()`. No parallelism, no branching, no
@@ -54,8 +59,10 @@
 //!
 //! # Composable wrappers
 //!
-//! - [`retry::Retry`] : retries a failing stage up to N times, resetting the
-//!   scratchpad between attempts.
+//! - [`retry::Retry`] : retries a failing stage up to N times. Before each
+//!   attempt the scratchpad is snapshotted via [`Clone`] and restored on failure,
+//!   so only the retried stage's writes are undone. Allocates if the scratchpad
+//!   contains heap data; not suitable for zero-allocation hot paths.
 //! - [`metrics::Timed`] : records per-stage execution latency using lock-free
 //!   atomics and a rolling window for percentile computation.
 //! - [`instrument::Instrumented`] : emits a [`tracing`] span on every execution.
