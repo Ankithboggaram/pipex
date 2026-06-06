@@ -14,7 +14,7 @@ type StageFn<S> = fn(&mut S) -> Result<(), PipelineError>;
 /// The pipeline holds no data; stages are run by passing a mutable scratchpad
 /// reference to [`run`][Pipeline::run]. Because the pipeline has no mutable
 /// state after setup, `run` takes `&self`, allowing a single pipeline to be
-/// shared across threads via [`Arc`] while each thread supplies its own
+/// shared across threads via [`Arc`][std::sync::Arc] while each thread supplies its own
 /// scratchpad.
 ///
 /// Aligned to 64 bytes (one cache line). This benefits workloads where the

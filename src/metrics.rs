@@ -184,9 +184,9 @@ impl StageMetrics {
 
 /// Wraps a stage with nanosecond timing, recording to a [`StageMetrics`] instance.
 ///
-/// The metrics label is derived automatically from [`Stage::name`]. Retrieve the
-/// [`StageMetrics`] after construction via [`metrics`][Timed::metrics], then
-/// register with [`PipelineMetrics`] if needed.
+/// The metrics label is derived automatically from [`Stage::name`]. Construction
+/// returns the wrapper and its [`StageMetrics`] together; register the metrics
+/// with [`PipelineMetrics`] if needed.
 ///
 /// # Example
 /// ```
@@ -326,7 +326,7 @@ impl std::fmt::Display for PipelineSnapshot {
 /// Collects and aggregates metrics for all stages in a pipeline.
 ///
 /// Create one `PipelineMetrics` per pipeline, register each stage via
-/// [`track`][PipelineMetrics::track], and call [`snapshot`][PipelineMetrics::snapshot]
+/// [`register`][PipelineMetrics::register], and call [`snapshot`][PipelineMetrics::snapshot]
 /// to read all stage metrics in a single call.
 ///
 /// # Example
@@ -373,7 +373,7 @@ impl PipelineMetrics {
 
     /// Registers a pre-existing [`StageMetrics`] for tracking.
     ///
-    /// Use this with [`Timed::tracked`] to derive the label automatically and
+    /// Use this with [`Timed::new`] to derive the label automatically and
     /// still include the stage in a [`PipelineSnapshot`]:
     ///
     /// ```

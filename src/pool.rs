@@ -1,7 +1,7 @@
 //! Thread-safe pool of scratchpads for concurrent workloads.
 //!
 //! With pipelines decoupled from their scratchpad, the typical concurrent
-//! pattern is to share a single [`static_pipeline::Pipeline`] via [`Arc`] and
+//! pattern is to share a single [`static_pipeline::Pipeline`][crate::static_pipeline::Pipeline] via [`Arc`][std::sync::Arc] and
 //! pool only the scratchpads, one per concurrent caller.
 //!
 //! # Example
@@ -45,7 +45,7 @@ use crate::scratchpad::Scratchpad;
 
 /// A thread-safe pool of scratchpads for concurrent pipeline workloads.
 ///
-/// Share one pipeline via [`Arc`] across all threads; each thread acquires its
+/// Share one pipeline via [`Arc`][std::sync::Arc] across all threads; each thread acquires its
 /// own [`ScratchpadGuard`] from this pool. On drop, [`Scratchpad::reset`] is
 /// called and the scratchpad is returned. Scratchpads beyond
 /// [`capacity`][ScratchpadPool::capacity] are dropped rather than cached,
