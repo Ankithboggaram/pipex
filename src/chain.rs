@@ -1,6 +1,6 @@
 //! Tuple-based stage composition for inline zero-allocation pipelines.
 //!
-//! Implements [`Stage<S>`][crate::stage::Stage] for tuples of up to 12 stages,
+//! Implements [`Stage<S>`][crate::stage::Stage] for tuples of up to 16 stages,
 //! allowing a tuple to act as a self-contained pipeline. All stage state is
 //! stored inline in the tuple — no heap allocation, no dynamic dispatch, no
 //! capacity constant. Wrappers (`Timed`, `Retry`, `Deadline`, `Instrumented`)
