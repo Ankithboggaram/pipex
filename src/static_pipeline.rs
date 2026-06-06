@@ -186,9 +186,10 @@ mod tests {
 
     #[allow(clippy::unnecessary_wraps)]
     fn failing(_ctx: &mut TestScratchpad) -> Result<(), PipelineError> {
-        Err(PipelineError::StageFailed(String::from(
-            "intentional failure",
-        )))
+        Err(PipelineError::StageFailed {
+            stage: "failing",
+            message: String::from("intentional failure"),
+        })
     }
 
     #[test]
@@ -227,7 +228,7 @@ mod tests {
         let mut ctx = TestScratchpad::new(1.0);
         assert!(matches!(
             pipeline.run(&mut ctx),
-            Err(PipelineError::StageFailed(_))
+            Err(PipelineError::StageFailed { .. })
         ));
     }
 
@@ -268,7 +269,10 @@ mod tests {
                     });
                     match (double_pos, fail_pos) {
                         (Some(d), Some(f)) if d < f => Ok(()),
-                        _ => Err(PipelineError::InvalidState("wrong order".into())),
+                        _ => Err(PipelineError::InvalidState {
+                            context: "pipeline_check",
+                            message: "wrong order".into(),
+                        }),
                     }
                 })
                 .is_ok()

@@ -121,7 +121,10 @@ mod tests {
 
     impl Stage<Buf> for Fail {
         fn run(&mut self, _ctx: &mut Buf) -> Result<(), PipelineError> {
-            Err(PipelineError::StageFailed(String::from("intentional")))
+            Err(PipelineError::StageFailed {
+                stage: "Fail",
+                message: String::from("intentional"),
+            })
         }
     }
 

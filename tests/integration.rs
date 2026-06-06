@@ -41,9 +41,10 @@ impl Stage<MlScratchpad> for NormaliseStage {
     fn run(&mut self, ctx: &mut MlScratchpad) -> Result<(), PipelineError> {
         let max = ctx.raw.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         if max == 0.0 {
-            return Err(PipelineError::StageFailed(String::from(
-                "cannot normalise: max value is zero",
-            )));
+            return Err(PipelineError::StageFailed {
+                stage: "NormaliseStage",
+                message: String::from("cannot normalise: max value is zero"),
+            });
         }
         ctx.normalised
             .iter_mut()
@@ -69,9 +70,10 @@ struct AlwaysFailStage;
 
 impl Stage<MlScratchpad> for AlwaysFailStage {
     fn run(&mut self, _ctx: &mut MlScratchpad) -> Result<(), PipelineError> {
-        Err(PipelineError::StageFailed(String::from(
-            "intentional failure",
-        )))
+        Err(PipelineError::StageFailed {
+            stage: "AlwaysFailStage",
+            message: String::from("intentional failure"),
+        })
     }
 }
 
@@ -79,9 +81,10 @@ impl Stage<MlScratchpad> for AlwaysFailStage {
 fn normalise(ctx: &mut MlScratchpad) -> Result<(), PipelineError> {
     let max = ctx.raw.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     if max == 0.0 {
-        return Err(PipelineError::StageFailed(String::from(
-            "cannot normalise: max value is zero",
-        )));
+        return Err(PipelineError::StageFailed {
+            stage: "normalise",
+            message: String::from("cannot normalise: max value is zero"),
+        });
     }
     ctx.normalised
         .iter_mut()
@@ -132,7 +135,7 @@ mod dynamic_pipeline_tests {
         let mut ctx = MlScratchpad::new(vec![1.0, 2.0]);
         assert!(matches!(
             pipeline.run(&mut ctx),
-            Err(PipelineError::StageFailed(_))
+            Err(PipelineError::StageFailed { .. })
         ));
     }
 
@@ -142,7 +145,7 @@ mod dynamic_pipeline_tests {
         let mut ctx = MlScratchpad::new(vec![0.0, 0.0, 0.0]);
         assert!(matches!(
             pipeline.run(&mut ctx),
-            Err(PipelineError::StageFailed(_))
+            Err(PipelineError::StageFailed { .. })
         ));
     }
 
@@ -227,7 +230,10 @@ mod retry_tests {
         impl Stage<MlScratchpad> for WriteAndFail {
             fn run(&mut self, ctx: &mut MlScratchpad) -> Result<(), PipelineError> {
                 ctx.normalised.iter_mut().for_each(|x| *x = 99.0);
-                Err(PipelineError::StageFailed(String::from("fail")))
+                Err(PipelineError::StageFailed {
+                    stage: "WriteAndFail",
+                    message: String::from("fail"),
+                })
             }
         }
 
@@ -282,7 +288,7 @@ mod deadline_tests {
         let mut ctx = MlScratchpad::new(vec![1.0, 2.0]);
         assert!(matches!(
             pipeline.run(&mut ctx),
-            Err(PipelineError::StageFailed(_))
+            Err(PipelineError::StageFailed { .. })
         ));
     }
 
@@ -375,7 +381,10 @@ mod ordering_tests {
                         .position(|f| f.is_some_and(|f| std::ptr::fn_addr_eq(f, clamp as StageFn)));
                     match (n, c) {
                         (Some(n), Some(c)) if n < c => Ok(()),
-                        _ => Err(PipelineError::InvalidState("wrong order".into())),
+                        _ => Err(PipelineError::InvalidState {
+                            context: "pipeline_check",
+                            message: "wrong order".into(),
+                        }),
                     }
                 })
                 .is_ok()

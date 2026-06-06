@@ -103,7 +103,10 @@ mod tests {
 
     impl Stage<TestScratchpad> for FailStage {
         fn run(&mut self, _ctx: &mut TestScratchpad) -> Result<(), PipelineError> {
-            Err(PipelineError::StageFailed(String::from("fail")))
+            Err(PipelineError::StageFailed {
+                stage: "FailStage",
+                message: String::from("fail"),
+            })
         }
     }
 
@@ -120,7 +123,7 @@ mod tests {
         let mut ctx = TestScratchpad;
         assert!(matches!(
             stage.run(&mut ctx),
-            Err(PipelineError::StageFailed(_))
+            Err(PipelineError::StageFailed { .. })
         ));
     }
 

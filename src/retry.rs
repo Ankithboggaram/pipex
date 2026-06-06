@@ -137,9 +137,10 @@ mod tests {
 
     impl Stage<TestScratchpad> for FailingStage {
         fn run(&mut self, _ctx: &mut TestScratchpad) -> Result<(), PipelineError> {
-            Err(PipelineError::StageFailed(String::from(
-                "intentional failure",
-            )))
+            Err(PipelineError::StageFailed {
+                stage: "FailingStage",
+                message: String::from("intentional failure"),
+            })
         }
     }
 
@@ -168,7 +169,10 @@ mod tests {
         impl Stage<TestScratchpad> for WriteAndFail {
             fn run(&mut self, ctx: &mut TestScratchpad) -> Result<(), PipelineError> {
                 ctx.value += 100.0;
-                Err(PipelineError::StageFailed(String::from("fail")))
+                Err(PipelineError::StageFailed {
+                    stage: "WriteAndFail",
+                    message: String::from("fail"),
+                })
             }
         }
 

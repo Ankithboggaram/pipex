@@ -4,8 +4,14 @@
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum PipelineError {
-    /// A stage failed during execution, with a descriptive message.
-    StageFailed(String),
+    /// A stage failed during execution.
+    ///
+    /// `stage` is the name of the stage type or function that failed.
+    /// `message` describes what went wrong.
+    StageFailed {
+        stage: &'static str,
+        message: String,
+    },
 
     /// The pipeline has no stages to execute.
     EmptyPipeline,
@@ -13,8 +19,14 @@ pub enum PipelineError {
     /// The pipeline has no more room to grow.
     FullPipeline,
 
-    /// The scratchpad was in an unexpected state during execution.
-    InvalidState(String),
+    /// The scratchpad or pipeline configuration was in an unexpected state.
+    ///
+    /// `context` identifies where the unexpected state was detected.
+    /// `message` describes what was wrong.
+    InvalidState {
+        context: &'static str,
+        message: String,
+    },
 
     /// A stage failed after exhausting all retry attempts.
     ///
@@ -34,10 +46,14 @@ pub enum PipelineError {
 impl std::fmt::Display for PipelineError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PipelineError::StageFailed(msg) => write!(f, "stage failed: {msg}"),
+            PipelineError::StageFailed { stage, message } => {
+                write!(f, "stage '{stage}' failed: {message}")
+            }
             PipelineError::EmptyPipeline => write!(f, "pipeline has no stages"),
             PipelineError::FullPipeline => write!(f, "pipeline has no more room to grow"),
-            PipelineError::InvalidState(msg) => write!(f, "invalid state: {msg}"),
+            PipelineError::InvalidState { context, message } => {
+                write!(f, "invalid state in {context}: {message}")
+            }
             PipelineError::RetryExhausted { attempts, source } => {
                 write!(f, "stage failed after {attempts} attempts: {source}")
             }
@@ -69,7 +85,10 @@ mod tests {
 
     #[test]
     fn stage_failed_contains_message() {
-        let error = PipelineError::StageFailed(String::from("something went wrong"));
+        let error = PipelineError::StageFailed {
+            stage: "test",
+            message: String::from("something went wrong"),
+        };
         assert!(format!("{error:?}").contains("something went wrong"));
     }
 
@@ -95,7 +114,10 @@ mod tests {
     fn retry_exhausted_carries_source_error() {
         let error = PipelineError::RetryExhausted {
             attempts: 3,
-            source: Box::new(PipelineError::StageFailed(String::from("timed out"))),
+            source: Box::new(PipelineError::StageFailed {
+                stage: "test",
+                message: String::from("timed out"),
+            }),
         };
         assert!(format!("{error:?}").contains('3'));
         assert!(format!("{error}").contains("timed out"));
