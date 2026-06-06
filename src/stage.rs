@@ -29,6 +29,15 @@ pub trait Stage<S: Scratchpad>: Send {
     ///
     /// Returns a `PipelineError` if the stage fails during execution.
     fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError>;
+
+    /// Returns the name of this stage.
+    ///
+    /// Defaults to the fully qualified type name (e.g. `"mycrate::stages::Normalise"`).
+    /// Override to provide a shorter, human-readable label — useful for error messages,
+    /// metrics labels, and tracing spans.
+    fn name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 }
 
 // Provided for wiring code that builds stages incrementally at
@@ -38,5 +47,9 @@ impl<S: Scratchpad> Stage<S> for Box<dyn Stage<S>> {
     #[inline]
     fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
         (**self).run(ctx)
+    }
+
+    fn name(&self) -> &'static str {
+        (**self).name()
     }
 }

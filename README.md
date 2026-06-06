@@ -30,9 +30,6 @@ impl Scratchpad for Buf {
     fn reset(&mut self) {
         self.value = 0.0;
     }
-    fn validate(&self) -> bool {
-        true
-    }
 }
 
 struct Double;
@@ -63,10 +60,10 @@ Two pipeline variants:
 |---|---|
 | `Retry::new(stage, n)` | Re-run on failure, resetting the scratchpad between attempts |
 | `Timed::new(stage, metrics)` | Lock-free nanosecond timing with rolling window percentiles |
-| `Instrumented::new(stage, name)` | Emit a [`tracing`](https://docs.rs/tracing) span on every execution |
+| `Instrumented::new(stage)` | Emit a [`tracing`](https://docs.rs/tracing) span on every execution |
 | `Deadline::new(stage, duration)` | Return `DeadlineExceeded` if the stage exceeds its time budget |
 
-Wrappers are composable: `Timed::new(Instrumented::new(stage, "name"), metrics)`.
+Wrappers are composable: `Timed::new(Instrumented::new(stage), metrics)`.
 
 `PipelineMetrics` aggregates timing snapshots across all stages in one call:
 

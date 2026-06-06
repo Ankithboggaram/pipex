@@ -238,6 +238,10 @@ impl<S: Scratchpad, T: Stage<S>> Timed<S, T> {
 }
 
 impl<S: Scratchpad + Send, T: Stage<S>> Stage<S> for Timed<S, T> {
+    fn name(&self) -> &'static str {
+        self.stage.name()
+    }
+
     #[inline]
     fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
         let start = Instant::now();

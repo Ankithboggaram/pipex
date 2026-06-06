@@ -345,52 +345,6 @@ mod ordering_tests {
     use super::*;
 
     #[test]
-    fn dynamic_check_passes_with_correct_ordering() {
-        let pipeline = DynamicPipeline::new()
-            .stage(NormaliseStage)
-            .stage(ClampStage);
-        assert!(
-            pipeline
-                .check(|ids| {
-                    let n = ids
-                        .iter()
-                        .position(|id| *id == std::any::TypeId::of::<NormaliseStage>());
-                    let c = ids
-                        .iter()
-                        .position(|id| *id == std::any::TypeId::of::<ClampStage>());
-                    match (n, c) {
-                        (Some(n), Some(c)) if n < c => Ok(()),
-                        _ => Err(PipelineError::InvalidState("wrong order".into())),
-                    }
-                })
-                .is_ok()
-        );
-    }
-
-    #[test]
-    fn dynamic_check_fails_with_wrong_ordering() {
-        let pipeline = DynamicPipeline::new()
-            .stage(ClampStage)
-            .stage(NormaliseStage);
-        assert!(
-            pipeline
-                .check(|ids| {
-                    let n = ids
-                        .iter()
-                        .position(|id| *id == std::any::TypeId::of::<NormaliseStage>());
-                    let c = ids
-                        .iter()
-                        .position(|id| *id == std::any::TypeId::of::<ClampStage>());
-                    match (n, c) {
-                        (Some(n), Some(c)) if n < c => Ok(()),
-                        _ => Err(PipelineError::InvalidState("wrong order".into())),
-                    }
-                })
-                .is_err()
-        );
-    }
-
-    #[test]
     fn static_check_passes_with_correct_ordering() {
         type StageFn = fn(&mut MlScratchpad) -> Result<(), PipelineError>;
 
@@ -401,12 +355,12 @@ mod ordering_tests {
         assert!(
             pipeline
                 .check(|fns| {
-                    let n = fns
-                        .iter()
-                        .position(|f| std::ptr::fn_addr_eq(*f, normalise as StageFn));
+                    let n = fns.iter().position(|f| {
+                        f.is_some_and(|f| std::ptr::fn_addr_eq(f, normalise as StageFn))
+                    });
                     let c = fns
                         .iter()
-                        .position(|f| std::ptr::fn_addr_eq(*f, clamp as StageFn));
+                        .position(|f| f.is_some_and(|f| std::ptr::fn_addr_eq(f, clamp as StageFn)));
                     match (n, c) {
                         (Some(n), Some(c)) if n < c => Ok(()),
                         _ => Err(PipelineError::InvalidState("wrong order".into())),

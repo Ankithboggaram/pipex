@@ -108,20 +108,18 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
 
     /// Validates the pipeline's stage configuration with a user-provided closure.
     ///
-    /// Receives the ordered slice of stage function pointers.
+    /// Receives `&self.stages[..count]` — a slice of `Option<StageFn<S>>` with no
+    /// intermediate allocation. Every entry in the slice is `Some`; the `Option`
+    /// wrapper is a consequence of the fixed-size backing array.
     ///
     /// # Errors
     ///
     /// Returns the error returned by `validator`, if any.
     pub fn check<F>(&self, validator: F) -> Result<(), PipelineError>
     where
-        F: FnOnce(&[StageFn<S>]) -> Result<(), PipelineError>,
+        F: FnOnce(&[Option<StageFn<S>>]) -> Result<(), PipelineError>,
     {
-        let fns: Vec<StageFn<S>> = self.stages[..self.count]
-            .iter()
-            .filter_map(|s| *s)
-            .collect();
-        validator(&fns)
+        validator(&self.stages[..self.count])
     }
 
     /// Runs all stages in order against the provided scratchpad.
@@ -129,7 +127,6 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
     /// # Errors
     ///
     /// Returns `PipelineError::EmptyPipeline` if no stages have been added,
-    /// `PipelineError::ValidationFailed` if the scratchpad fails validation,
     /// or the error from the first stage that fails.
     #[inline]
     pub fn run(&self, ctx: &mut S) -> Result<(), PipelineError> {
@@ -251,12 +248,16 @@ mod tests {
         assert!(
             pipeline
                 .check(|fns| {
-                    let double_pos = fns
-                        .iter()
-                        .position(|f| std::ptr::fn_addr_eq(*f, double as StageFn<TestScratchpad>));
-                    let fail_pos = fns
-                        .iter()
-                        .position(|f| std::ptr::fn_addr_eq(*f, failing as StageFn<TestScratchpad>));
+                    let double_pos = fns.iter().position(|f| {
+                        f.is_some_and(|f| {
+                            std::ptr::fn_addr_eq(f, double as StageFn<TestScratchpad>)
+                        })
+                    });
+                    let fail_pos = fns.iter().position(|f| {
+                        f.is_some_and(|f| {
+                            std::ptr::fn_addr_eq(f, failing as StageFn<TestScratchpad>)
+                        })
+                    });
                     match (double_pos, fail_pos) {
                         (Some(d), Some(f)) if d < f => Ok(()),
                         _ => Err(PipelineError::InvalidState("wrong order".into())),

@@ -66,6 +66,10 @@ impl<S: Scratchpad, T: Stage<S>> Deadline<S, T> {
 }
 
 impl<S: Scratchpad, T: Stage<S>> Stage<S> for Deadline<S, T> {
+    fn name(&self) -> &'static str {
+        self.stage.name()
+    }
+
     #[inline]
     fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
         let start = Instant::now();

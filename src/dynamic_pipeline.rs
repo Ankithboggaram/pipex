@@ -1,7 +1,5 @@
 //! Dynamic pipeline executor using boxed trait objects for runtime flexibility.
 
-use std::any::TypeId;
-
 use crate::error::PipelineError;
 use crate::scratchpad::Scratchpad;
 use crate::stage::Stage;
@@ -31,7 +29,6 @@ use crate::stage::Stage;
 /// ```
 pub struct Pipeline<S: Scratchpad> {
     stages: Vec<Box<dyn Stage<S>>>,
-    stage_type_ids: Vec<TypeId>,
 }
 
 impl<S: Scratchpad> Default for Pipeline<S> {
@@ -52,67 +49,27 @@ impl<S: Scratchpad> Pipeline<S> {
     /// Creates a new empty pipeline.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            stages: Vec::new(),
-            stage_type_ids: Vec::new(),
-        }
+        Self { stages: Vec::new() }
     }
 
     /// Adds a stage and returns the pipeline for chaining.
     #[must_use]
     pub fn stage<T: Stage<S> + 'static>(mut self, stage: T) -> Self {
-        self.stage_type_ids.push(TypeId::of::<T>());
         self.stages.push(Box::new(stage));
         self
     }
 
     /// Adds a stage to the pipeline.
     pub fn add_stage<T: Stage<S> + 'static>(&mut self, stage: T) {
-        self.stage_type_ids.push(TypeId::of::<T>());
         self.stages.push(Box::new(stage));
     }
 
     /// Adds a pre-boxed stage directly, avoiding a double-box allocation.
     ///
-    /// Intended for downstream wiring code that builds wrapped stages
-    /// incrementally before handing them to the pipeline. Stage type
-    /// information is not tracked for stages added via this method.
+    /// Useful for wiring code that builds wrapped stages incrementally before
+    /// handing them to the pipeline.
     pub fn push_boxed(&mut self, stage: Box<dyn Stage<S>>) {
         self.stages.push(stage);
-    }
-
-    /// Returns `true` if the pipeline contains a stage of type `T`.
-    ///
-    /// Only tracks stages added via [`stage`][Pipeline::stage] or
-    /// [`add_stage`][Pipeline::add_stage], not [`push_boxed`][Pipeline::push_boxed].
-    #[must_use]
-    pub fn contains_stage<T: Stage<S> + 'static>(&self) -> bool {
-        self.stage_type_ids.contains(&TypeId::of::<T>())
-    }
-
-    /// Returns the index of the first stage of type `T`, or `None` if not present.
-    ///
-    /// Only tracks stages added via [`stage`][Pipeline::stage] or
-    /// [`add_stage`][Pipeline::add_stage], not [`push_boxed`][Pipeline::push_boxed].
-    #[must_use]
-    pub fn stage_position<T: Stage<S> + 'static>(&self) -> Option<usize> {
-        self.stage_type_ids
-            .iter()
-            .position(|id| *id == TypeId::of::<T>())
-    }
-
-    /// Validates the pipeline's stage configuration with a user-provided closure.
-    ///
-    /// Receives the ordered slice of [`TypeId`]s for all tracked stages.
-    ///
-    /// # Errors
-    ///
-    /// Returns the error returned by `validator`, if any.
-    pub fn check<F>(&self, validator: F) -> Result<(), PipelineError>
-    where
-        F: FnOnce(&[TypeId]) -> Result<(), PipelineError>,
-    {
-        validator(&self.stage_type_ids)
     }
 
     /// Runs all stages in order against the provided scratchpad.
@@ -120,7 +77,6 @@ impl<S: Scratchpad> Pipeline<S> {
     /// # Errors
     ///
     /// Returns `PipelineError::EmptyPipeline` if no stages have been added,
-    /// `PipelineError::ValidationFailed` if the scratchpad fails validation,
     /// or the error from the first stage that fails.
     #[inline]
     pub fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
@@ -206,6 +162,15 @@ mod tests {
     }
 
     #[test]
+    fn multiple_stages_run_in_order() {
+        let mut pipeline = Pipeline::new().stage(StageA).stage(StageB);
+        let mut ctx = TestScratchpad::new(2.0);
+        assert!(pipeline.run(&mut ctx).is_ok());
+        // StageA: 2.0 * 2.0 = 4.0, StageB: 4.0 + 1.0 = 5.0
+        assert_eq!(ctx.value, 5.0);
+    }
+
+    #[test]
     fn failing_stage_returns_error() {
         let mut pipeline = Pipeline::new().stage(FailingStage);
         let mut ctx = TestScratchpad::new(1.0);
@@ -216,66 +181,11 @@ mod tests {
     }
 
     #[test]
-    fn contains_stage_detects_added_type() {
-        let pipeline = Pipeline::new().stage(StageA).stage(StageB);
-        assert!(pipeline.contains_stage::<StageA>());
-        assert!(pipeline.contains_stage::<StageB>());
-        assert!(!pipeline.contains_stage::<FailingStage>());
-    }
-
-    #[test]
-    fn stage_position_returns_correct_index() {
-        let pipeline = Pipeline::new().stage(StageA).stage(StageB);
-        assert_eq!(pipeline.stage_position::<StageA>(), Some(0));
-        assert_eq!(pipeline.stage_position::<StageB>(), Some(1));
-        assert_eq!(pipeline.stage_position::<FailingStage>(), None);
-    }
-
-    #[test]
-    fn check_passes_with_valid_ordering() {
-        let pipeline = Pipeline::new().stage(StageA).stage(StageB);
-        assert!(
-            pipeline
-                .check(|ids| {
-                    let a = ids
-                        .iter()
-                        .position(|id| *id == TypeId::of::<StageA>())
-                        .unwrap();
-                    let b = ids
-                        .iter()
-                        .position(|id| *id == TypeId::of::<StageB>())
-                        .unwrap();
-                    if a < b {
-                        Ok(())
-                    } else {
-                        Err(PipelineError::InvalidState("wrong order".into()))
-                    }
-                })
-                .is_ok()
-        );
-    }
-
-    #[test]
-    fn check_fails_with_invalid_ordering() {
-        let pipeline = Pipeline::new().stage(StageB).stage(StageA);
-        assert!(
-            pipeline
-                .check(|ids| {
-                    let a = ids
-                        .iter()
-                        .position(|id| *id == TypeId::of::<StageA>())
-                        .unwrap();
-                    let b = ids
-                        .iter()
-                        .position(|id| *id == TypeId::of::<StageB>())
-                        .unwrap();
-                    if a < b {
-                        Ok(())
-                    } else {
-                        Err(PipelineError::InvalidState("wrong order".into()))
-                    }
-                })
-                .is_err()
-        );
+    fn push_boxed_stage_runs_correctly() {
+        let mut pipeline = Pipeline::new();
+        pipeline.push_boxed(Box::new(StageA));
+        let mut ctx = TestScratchpad::new(3.0);
+        assert!(pipeline.run(&mut ctx).is_ok());
+        assert_eq!(ctx.value, 6.0);
     }
 }

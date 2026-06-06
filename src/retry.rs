@@ -56,6 +56,10 @@ impl<S: Scratchpad, T: Stage<S>> Retry<S, T> {
 }
 
 impl<S: Scratchpad + Send, T: Stage<S>> Stage<S> for Retry<S, T> {
+    fn name(&self) -> &'static str {
+        self.stage.name()
+    }
+
     #[inline]
     fn run(&mut self, ctx: &mut S) -> Result<(), PipelineError> {
         let mut last_error = None;
@@ -74,9 +78,8 @@ impl<S: Scratchpad + Send, T: Stage<S>> Stage<S> for Retry<S, T> {
 
         Err(PipelineError::RetryExhausted {
             attempts: self.retries + 1,
-            reason: format!(
-                "{:?}",
-                last_error.expect("last_error is Some after at least one loop iteration")
+            source: Box::new(
+                last_error.expect("last_error is Some after at least one loop iteration"),
             ),
         })
     }

@@ -409,8 +409,7 @@ mod instrumentation_overhead {
 
     #[divan::bench]
     fn instrumented_stage(bencher: Bencher) {
-        let mut pipeline =
-            DynamicPipeline::new().stage(Instrumented::new(NormaliseStage, "normalise"));
+        let mut pipeline = DynamicPipeline::new().stage(Instrumented::new(NormaliseStage));
         let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {
@@ -423,7 +422,7 @@ mod instrumentation_overhead {
     fn timed_and_instrumented_stage(bencher: Bencher) {
         let metrics = StageMetrics::new("normalise");
         let mut pipeline = DynamicPipeline::new().stage(Timed::new(
-            Instrumented::new(NormaliseStage, "normalise"),
+            Instrumented::new(NormaliseStage),
             Arc::clone(&metrics),
         ));
         let mut ctx = BenchScratchpad::new(10_000);

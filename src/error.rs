@@ -18,8 +18,12 @@ pub enum PipelineError {
 
     /// A stage failed after exhausting all retry attempts.
     ///
-    /// Carries the number of attempts made and the final error message.
-    RetryExhausted { attempts: u32, reason: String },
+    /// Carries the number of attempts made and the last error returned by the stage.
+    /// The original error is accessible via [`std::error::Error::source`].
+    RetryExhausted {
+        attempts: u32,
+        source: Box<PipelineError>,
+    },
 
     /// A stage completed successfully but exceeded its time budget.
     ///
@@ -34,8 +38,8 @@ impl std::fmt::Display for PipelineError {
             PipelineError::EmptyPipeline => write!(f, "pipeline has no stages"),
             PipelineError::FullPipeline => write!(f, "pipeline has no more room to grow"),
             PipelineError::InvalidState(msg) => write!(f, "invalid state: {msg}"),
-            PipelineError::RetryExhausted { attempts, reason } => {
-                write!(f, "stage failed after {attempts} attempts: {reason}")
+            PipelineError::RetryExhausted { attempts, source } => {
+                write!(f, "stage failed after {attempts} attempts: {source}")
             }
             PipelineError::DeadlineExceeded {
                 budget_ns,
@@ -50,7 +54,14 @@ impl std::fmt::Display for PipelineError {
     }
 }
 
-impl std::error::Error for PipelineError {}
+impl std::error::Error for PipelineError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            PipelineError::RetryExhausted { source, .. } => Some(source.as_ref()),
+            _ => None,
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -81,13 +92,13 @@ mod tests {
     }
 
     #[test]
-    fn retry_exhausted_contains_attempts_and_reason() {
+    fn retry_exhausted_carries_source_error() {
         let error = PipelineError::RetryExhausted {
             attempts: 3,
-            reason: String::from("timed out"),
+            source: Box::new(PipelineError::StageFailed(String::from("timed out"))),
         };
-        let debug = format!("{error:?}");
-        assert!(debug.contains('3'));
-        assert!(debug.contains("timed out"));
+        assert!(format!("{error:?}").contains('3'));
+        assert!(format!("{error}").contains("timed out"));
+        assert!(std::error::Error::source(&error).is_some());
     }
 }
