@@ -434,3 +434,86 @@ mod instrumentation_overhead {
         });
     }
 }
+
+// The headline comparison: bare sequential calls vs. pipex abstractions.
+// If pipex static is within noise of hand_written, the zero-overhead claim holds.
+mod sequential_comparison {
+    use super::*;
+    use stages::*;
+
+    // Bare sequential function calls — no loop, no abstraction, no indirection.
+    #[divan::bench(args = [100, 10_000, 1_000_000])]
+    fn hand_written(bencher: Bencher, size: usize) {
+        let mut ctx = BenchScratchpad::new(size);
+
+        bencher.bench_local(|| {
+            ctx.reset();
+            black_box(normalise(&mut ctx)).unwrap();
+            black_box(clamp(&mut ctx)).unwrap();
+            black_box(scale(&mut ctx)).unwrap();
+        });
+    }
+
+    // Manual function pointer array loop — what you'd write without pipex.
+    #[divan::bench(args = [100, 10_000, 1_000_000])]
+    fn fn_pointer_loop(bencher: Bencher, size: usize) {
+        type StageFn = fn(&mut BenchScratchpad) -> Result<(), PipelineError>;
+        let stages: [StageFn; 3] = [normalise, clamp, scale];
+        let mut ctx = BenchScratchpad::new(size);
+
+        bencher.bench_local(|| {
+            ctx.reset();
+            for stage in &stages {
+                black_box(stage(&mut ctx)).unwrap();
+            }
+        });
+    }
+
+    // pipex static pipeline — function pointers, zero allocation.
+    #[divan::bench(args = [100, 10_000, 1_000_000])]
+    fn pipex_static(bencher: Bencher, size: usize) {
+        let mut pipeline = StaticPipeline::<BenchScratchpad, 3>::new();
+        pipeline.add_stage(normalise).unwrap();
+        pipeline.add_stage(clamp).unwrap();
+        pipeline.add_stage(scale).unwrap();
+        let mut ctx = BenchScratchpad::new(size);
+
+        bencher.bench_local(|| {
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
+        });
+    }
+
+    // pipex dynamic pipeline — boxed trait objects, runtime composition.
+    #[divan::bench(args = [100, 10_000, 1_000_000])]
+    fn pipex_dynamic(bencher: Bencher, size: usize) {
+        let mut pipeline = DynamicPipeline::new()
+            .stage(NormaliseStage)
+            .stage(ClampStage)
+            .stage(ScaleStage);
+        let mut ctx = BenchScratchpad::new(size);
+
+        bencher.bench_local(|| {
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
+        });
+    }
+
+    // pipex static + per-stage timing — cost of full observability on the hot path.
+    #[divan::bench(args = [100, 10_000, 1_000_000])]
+    fn pipex_static_timed(bencher: Bencher, size: usize) {
+        let m1 = StageMetrics::new("normalise");
+        let m2 = StageMetrics::new("clamp");
+        let m3 = StageMetrics::new("scale");
+        let mut pipeline = DynamicPipeline::new()
+            .stage(Timed::new(NormaliseStage, Arc::clone(&m1)))
+            .stage(Timed::new(ClampStage, Arc::clone(&m2)))
+            .stage(Timed::new(ScaleStage, Arc::clone(&m3)));
+        let mut ctx = BenchScratchpad::new(size);
+
+        bencher.bench_local(|| {
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
+        });
+    }
+}

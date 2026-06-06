@@ -1,7 +1,9 @@
 # pipex
 
-Zero-allocation stage executor for deterministic, sequential workloads in Rust.
+A zero-allocation pipeline executor for deterministic workloads in Rust.
 
+Individual pipeline stages transform a shared scratchpad in sequence. The pipeline owns no data and never touches the allocator on the execution path. No scheduler, no async runtime, and no hidden overhead. Designed for domains where performance and low latency are a priority, such as ML inference, robotics, signal processing, real-time control, and embedded systems.
+ca
 ---
 
 ## Install
@@ -121,15 +123,17 @@ Wrappers compose: `Timed::new(Instrumented::new(stage), metrics)`.
 
 ## Performance
 
-Measured on Apple Silicon using [divan](https://github.com/nvzqz/divan). All timings are medians.
+Measured on Apple Silicon using [divan](https://github.com/nvzqz/divan). All timings are medians. Three stages (normalise, clamp, scale) over varying buffer sizes.
 
-| Data size | Dynamic | Static | Naive (allocating) |
-|---|---|---|---|
-| 100 | 17 ns | 17 ns | 64 ns |
-| 10,000 | 1.6 µs | 1.1 µs | 2.4 µs |
-| 1,000,000 | 97 µs | 97 µs | 237 µs |
+| Data size | Hand-written | Static | Dynamic | Static + Timed |
+|---|---|---|---|---|
+| 100 | 26 ns | 25 ns | 25 ns | 170 ns |
+| 10,000 | 2.3 µs | 2.2 µs | 2.2 µs | 2.3 µs |
+| 1,000,000 | 224 µs | 210 µs | 211 µs | 209 µs |
 
-Pool acquire+run+return (~1.3 µs) vs. allocating a new scratchpad per call (~3.3 µs): ~2.5x faster under load.
+- Static pipeline matches hand-written sequential calls at every data size.
+- `Timed` adds ~50 ns per stage (one clock read each side). At small data sizes this dominates; at 10,000+ elements it is unmeasurable against the actual work.
+- Pool acquire+run+return (~1.3 µs) vs. allocating a new scratchpad per call (~3.3 µs): ~2.5x faster under load.
 
 ---
 
