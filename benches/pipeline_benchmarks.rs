@@ -38,10 +38,6 @@ impl Scratchpad for BenchScratchpad {
         self.output.iter_mut().for_each(|x| *x = 0.0);
         self.temp.iter_mut().for_each(|x| *x = 0.0);
     }
-
-    fn validate(&self) -> bool {
-        !self.input.is_empty()
-    }
 }
 
 mod stages {

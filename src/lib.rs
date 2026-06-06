@@ -83,7 +83,6 @@
 //!
 //! impl Scratchpad for Buffer {
 //!     fn reset(&mut self) { self.output.iter_mut().for_each(|x| *x = 0.0); }
-//!     fn validate(&self) -> bool { !self.values.is_empty() }
 //! }
 //!
 //! struct Normalise;

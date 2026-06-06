@@ -23,7 +23,6 @@ use crate::stage::Stage;
 ///
 /// impl Scratchpad for MyScratchpad {
 ///     fn reset(&mut self) {}
-///     fn validate(&self) -> bool { true }
 /// }
 ///
 /// struct MyStage;
@@ -82,9 +81,6 @@ mod tests {
 
     impl Scratchpad for TestScratchpad {
         fn reset(&mut self) {}
-        fn validate(&self) -> bool {
-            true
-        }
     }
 
     struct NoopStage;

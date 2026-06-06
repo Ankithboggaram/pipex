@@ -30,7 +30,6 @@ type StageFn<S> = fn(&mut S) -> Result<(), PipelineError>;
 ///
 /// impl Scratchpad for Buf {
 ///     fn reset(&mut self) { self.value = 0.0; }
-///     fn validate(&self) -> bool { true }
 /// }
 ///
 /// fn double(ctx: &mut Buf) -> Result<(), PipelineError> {
@@ -138,10 +137,6 @@ impl<S: Scratchpad, const N: usize> Pipeline<S, N> {
             return Err(empty_pipeline());
         }
 
-        if !ctx.validate() {
-            return Err(validation_failed());
-        }
-
         for i in 0..self.count {
             if let Some(stage) = self.stages[i] {
                 stage(ctx)?;
@@ -158,39 +153,23 @@ fn empty_pipeline() -> PipelineError {
     PipelineError::EmptyPipeline
 }
 
-#[cold]
-#[inline(never)]
-fn validation_failed() -> PipelineError {
-    PipelineError::ValidationFailed(String::from(
-        "scratchpad failed validation before pipeline execution",
-    ))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     struct TestScratchpad {
         value: f32,
-        is_valid: bool,
     }
 
     impl TestScratchpad {
         fn new(value: f32) -> Self {
-            Self {
-                value,
-                is_valid: true,
-            }
+            Self { value }
         }
     }
 
     impl Scratchpad for TestScratchpad {
         fn reset(&mut self) {
             self.value = 0.0;
-        }
-
-        fn validate(&self) -> bool {
-            self.is_valid
         }
     }
 
@@ -214,18 +193,6 @@ mod tests {
         assert!(matches!(
             pipeline.run(&mut ctx),
             Err(PipelineError::EmptyPipeline)
-        ));
-    }
-
-    #[test]
-    fn validation_failure_blocks_execution() {
-        let mut pipeline = Pipeline::<TestScratchpad, 2>::new();
-        pipeline.add_stage(double).unwrap();
-        let mut ctx = TestScratchpad::new(1.0);
-        ctx.is_valid = false;
-        assert!(matches!(
-            pipeline.run(&mut ctx),
-            Err(PipelineError::ValidationFailed(_))
         ));
     }
 

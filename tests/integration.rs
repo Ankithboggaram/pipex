@@ -32,10 +32,6 @@ impl Scratchpad for MlScratchpad {
         self.normalised.iter_mut().for_each(|x| *x = 0.0);
         self.clamped.iter_mut().for_each(|x| *x = 0.0);
     }
-
-    fn validate(&self) -> bool {
-        !self.raw.is_empty()
-    }
 }
 
 struct NormaliseStage;
@@ -130,16 +126,6 @@ mod dynamic_pipeline_tests {
     }
 
     #[test]
-    fn returns_validation_error_on_empty_scratchpad() {
-        let mut pipeline = DynamicPipeline::new().stage(NormaliseStage);
-        let mut ctx = MlScratchpad::new(vec![]);
-        assert!(matches!(
-            pipeline.run(&mut ctx),
-            Err(PipelineError::ValidationFailed(_))
-        ));
-    }
-
-    #[test]
     fn returns_stage_error_on_failure() {
         let mut pipeline = DynamicPipeline::new().stage(AlwaysFailStage);
         let mut ctx = MlScratchpad::new(vec![1.0, 2.0]);
@@ -208,17 +194,6 @@ mod static_pipeline_tests {
         assert!(matches!(
             pipeline.add_stage(clamp),
             Err(PipelineError::FullPipeline)
-        ));
-    }
-
-    #[test]
-    fn returns_validation_error_on_empty_scratchpad() {
-        let mut pipeline = StaticPipeline::<MlScratchpad, 1>::new();
-        pipeline.add_stage(normalise).unwrap();
-        let mut ctx = MlScratchpad::new(vec![]);
-        assert!(matches!(
-            pipeline.run(&mut ctx),
-            Err(PipelineError::ValidationFailed(_))
         ));
     }
 }

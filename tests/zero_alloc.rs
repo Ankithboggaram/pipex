@@ -48,10 +48,6 @@ impl Scratchpad for ZeroAllocScratchpad {
     fn reset(&mut self) {
         self.values.iter_mut().for_each(|x| *x = 0.0);
     }
-
-    fn validate(&self) -> bool {
-        !self.values.is_empty()
-    }
 }
 
 struct ScaleStage;

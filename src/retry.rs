@@ -21,7 +21,6 @@ use crate::stage::Stage;
 ///
 /// impl Scratchpad for MyScratchpad {
 ///     fn reset(&mut self) { self.value = 0.0; }
-///     fn validate(&self) -> bool { true }
 /// }
 ///
 /// struct DoubleValues;
@@ -89,25 +88,17 @@ mod tests {
 
     struct TestScratchpad {
         value: f32,
-        is_valid: bool,
     }
 
     impl TestScratchpad {
         fn new(value: f32) -> Self {
-            Self {
-                value,
-                is_valid: true,
-            }
+            Self { value }
         }
     }
 
     impl Scratchpad for TestScratchpad {
         fn reset(&mut self) {
             self.value = 0.0;
-        }
-
-        fn validate(&self) -> bool {
-            self.is_valid
         }
     }
 

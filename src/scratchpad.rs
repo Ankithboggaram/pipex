@@ -24,10 +24,6 @@
 ///     fn reset(&mut self) {
 ///         self.values.clear();
 ///     }
-///
-///     fn validate(&self) -> bool {
-///         !self.values.is_empty()
-///     }
 /// }
 /// ```
 pub trait Scratchpad {
@@ -35,10 +31,4 @@ pub trait Scratchpad {
     ///
     /// Called by the pipeline between runs.
     fn reset(&mut self);
-
-    /// Validates that the scratchpad is in a usable state before
-    /// the pipeline begins execution.
-    ///
-    /// Returns `true` if valid, `false` otherwise.
-    fn validate(&self) -> bool;
 }

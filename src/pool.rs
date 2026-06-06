@@ -17,7 +17,6 @@
 //!
 //! impl Scratchpad for Buf {
 //!     fn reset(&mut self) { self.value = 0.0; }
-//!     fn validate(&self) -> bool { true }
 //! }
 //!
 //! fn double(ctx: &mut Buf) -> Result<(), PipelineError> {
@@ -142,21 +141,17 @@ mod tests {
 
     struct Buf {
         value: f32,
-        valid: bool,
     }
 
     impl Buf {
         fn new(value: f32) -> Self {
-            Self { value, valid: true }
+            Self { value }
         }
     }
 
     impl Scratchpad for Buf {
         fn reset(&mut self) {
             self.value = 0.0;
-        }
-        fn validate(&self) -> bool {
-            self.valid
         }
     }
 
@@ -217,23 +212,6 @@ mod tests {
         }
         let ctx = pool.acquire();
         assert_eq!(ctx.value, 0.0);
-    }
-
-    #[test]
-    fn validation_runs_on_each_acquisition() {
-        let pipeline = make_pipeline();
-        let pool: ScratchpadPool<Buf> = ScratchpadPool::new(1, || Buf::new(0.0));
-        {
-            let mut ctx = pool.acquire();
-            ctx.value = 2.0;
-            pipeline.run(&mut ctx).unwrap();
-        }
-        let mut ctx = pool.acquire();
-        ctx.valid = false;
-        assert!(matches!(
-            pipeline.run(&mut ctx),
-            Err(PipelineError::ValidationFailed(_))
-        ));
     }
 
     #[test]

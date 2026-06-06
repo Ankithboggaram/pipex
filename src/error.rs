@@ -7,9 +7,6 @@ pub enum PipelineError {
     /// A stage failed during execution, with a descriptive message.
     StageFailed(String),
 
-    /// The scratchpad failed validation before execution began.
-    ValidationFailed(String),
-
     /// The pipeline has no stages to execute.
     EmptyPipeline,
 
@@ -34,7 +31,6 @@ impl std::fmt::Display for PipelineError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PipelineError::StageFailed(msg) => write!(f, "stage failed: {msg}"),
-            PipelineError::ValidationFailed(msg) => write!(f, "validation failed: {msg}"),
             PipelineError::EmptyPipeline => write!(f, "pipeline has no stages"),
             PipelineError::FullPipeline => write!(f, "pipeline has no more room to grow"),
             PipelineError::InvalidState(msg) => write!(f, "invalid state: {msg}"),
@@ -64,12 +60,6 @@ mod tests {
     fn stage_failed_contains_message() {
         let error = PipelineError::StageFailed(String::from("something went wrong"));
         assert!(format!("{error:?}").contains("something went wrong"));
-    }
-
-    #[test]
-    fn validation_failed_contains_message() {
-        let error = PipelineError::ValidationFailed(String::from("invalid state"));
-        assert!(format!("{error:?}").contains("invalid state"));
     }
 
     #[test]

@@ -204,7 +204,6 @@ impl StageMetrics {
 ///
 /// impl Scratchpad for MyScratchpad {
 ///     fn reset(&mut self) {}
-///     fn validate(&self) -> bool { true }
 /// }
 ///
 /// struct MyStage;
@@ -322,7 +321,6 @@ impl std::fmt::Display for PipelineSnapshot {
 /// struct MyScratchpad;
 /// impl Scratchpad for MyScratchpad {
 ///     fn reset(&mut self) {}
-///     fn validate(&self) -> bool { true }
 /// }
 ///
 /// struct NoopStage;
@@ -393,9 +391,6 @@ mod tests {
 
     impl Scratchpad for TestScratchpad {
         fn reset(&mut self) {}
-        fn validate(&self) -> bool {
-            true
-        }
     }
 
     struct NoopStage;
