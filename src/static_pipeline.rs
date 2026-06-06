@@ -17,8 +17,9 @@ type StageFn<S> = fn(&mut S) -> Result<(), PipelineError>;
 /// shared across threads via [`Arc`] while each thread supplies its own
 /// scratchpad.
 ///
-/// Aligned to 64 bytes (one cache line) so the function pointer array is
-/// read from a clean cache-line boundary on every `run()` call.
+/// Aligned to 64 bytes (one cache line). This benefits workloads where the
+/// function pointer array is read repeatedly from the same thread; the gain
+/// is workload-dependent and not universally guaranteed.
 ///
 /// # Function pointer constraint
 ///
