@@ -216,8 +216,8 @@ impl StageMetrics {
 /// }
 ///
 /// let metrics = StageMetrics::new("my_stage");
-/// let mut pipeline = Pipeline::new(MyScratchpad)
-///     .stage(Timed::new(MyStage, Arc::clone(&metrics)));
+/// let mut pipeline = Pipeline::new().stage(Timed::new(MyStage, Arc::clone(&metrics)));
+/// let mut ctx = MyScratchpad;
 /// ```
 #[derive(Debug)]
 pub struct Timed<S: Scratchpad, T: Stage<S>> {
@@ -332,10 +332,9 @@ impl std::fmt::Display for PipelineSnapshot {
 ///
 /// let mut pm = PipelineMetrics::new();
 ///
-/// let mut pipeline = Pipeline::new(MyScratchpad)
-///     .stage(Timed::new(NoopStage, pm.track("noop")));
-///
-/// pipeline.run().unwrap();
+/// let mut pipeline = Pipeline::new().stage(Timed::new(NoopStage, pm.track("noop")));
+/// let mut ctx = MyScratchpad;
+/// pipeline.run(&mut ctx).unwrap();
 ///
 /// let snapshot = pm.snapshot();
 /// assert_eq!(snapshot.stages.len(), 1);

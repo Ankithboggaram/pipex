@@ -8,10 +8,13 @@
 //!
 //! Two execution models are provided:
 //!
-//! - [`dynamic_pipeline::Pipeline`]: stages stored as [`Box<dyn Stage<S>>`][stage::Stage],
-//!   supporting heterogeneous stage types configured at runtime.
 //! - [`static_pipeline::Pipeline`]: stages stored as a fixed-size array of function
 //!   pointers, with no heap allocation after initialisation and no vtable overhead.
+//!   Takes `&self` on `run`, so a single instance can be shared across threads via `Arc`.
+//! - [`dynamic_pipeline::Pipeline`]: stages stored as [`Box<dyn Stage<S>>`][stage::Stage],
+//!   supporting heterogeneous stage types configured at runtime.
+//!
+//! Both pipelines borrow the scratchpad at run time: `pipeline.run(&mut ctx)`.
 //!
 //! # Composable wrappers
 //!
@@ -26,10 +29,10 @@
 //!
 //! # Pooling
 //!
-//! [`pool::PipelinePool`] manages a fixed-capacity stock of pre-built pipelines
-//! for concurrent workloads. Callers acquire a [`pool::PoolGuard`] (which derefs
-//! to the pipeline), and on drop the scratchpad is reset and the pipeline is
-//! returned for the next caller.
+//! [`pool::ScratchpadPool`] manages a fixed-capacity stock of pre-allocated scratchpads
+//! for concurrent workloads. Share one pipeline via `Arc`; each thread acquires a
+//! [`pool::ScratchpadGuard`] from the pool, uses it, and on drop the scratchpad is
+//! reset and returned.
 //!
 //! # Example
 //!
@@ -59,10 +62,9 @@
 //!     }
 //! }
 //!
-//! let mut pipeline = Pipeline::new(Buffer { values: vec![1.0, 2.0, 4.0], output: vec![0.0; 3] })
-//!     .stage(Normalise);
-//!
-//! pipeline.run().unwrap();
+//! let mut pipeline = Pipeline::new().stage(Normalise);
+//! let mut ctx = Buffer { values: vec![1.0, 2.0, 4.0], output: vec![0.0; 3] };
+//! pipeline.run(&mut ctx).unwrap();
 //! ```
 
 pub mod deadline;

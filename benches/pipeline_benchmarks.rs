@@ -4,7 +4,7 @@ use pipex::dynamic_pipeline::Pipeline as DynamicPipeline;
 use pipex::error::PipelineError;
 use pipex::instrument::Instrumented;
 use pipex::metrics::{StageMetrics, Timed};
-use pipex::pool::PipelinePool;
+use pipex::pool::ScratchpadPool;
 use pipex::retry::Retry;
 use pipex::scratchpad::Scratchpad;
 use pipex::stage::Stage;
@@ -146,22 +146,24 @@ mod single_stage {
 
     #[divan::bench(args = [100, 10_000, 1_000_000])]
     fn dynamic(bencher: Bencher, size: usize) {
-        let mut pipeline = DynamicPipeline::new(BenchScratchpad::new(size)).stage(NormaliseStage);
+        let mut pipeline = DynamicPipeline::new().stage(NormaliseStage);
+        let mut ctx = BenchScratchpad::new(size);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 
     #[divan::bench(args = [100, 10_000, 1_000_000])]
     fn static_pipeline(bencher: Bencher, size: usize) {
-        let mut pipeline = StaticPipeline::<BenchScratchpad, 1>::new(BenchScratchpad::new(size));
+        let mut pipeline = StaticPipeline::<BenchScratchpad, 1>::new();
         pipeline.add_stage(normalise).unwrap();
+        let mut ctx = BenchScratchpad::new(size);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 
@@ -195,12 +197,13 @@ mod scaling {
 
     #[divan::bench(args = [1, 5, 10])]
     fn dynamic(bencher: Bencher, count: usize) {
-        let mut pipeline = DynamicPipeline::new(BenchScratchpad::new(10_000));
+        let mut pipeline = DynamicPipeline::new();
         add_stages_dynamic(&mut pipeline, count);
+        let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 
@@ -209,14 +212,15 @@ mod scaling {
         let static_fns: [StageFn; 10] = [
             normalise, clamp, scale, sum_reduce, delta, normalise, clamp, scale, sum_reduce, delta,
         ];
-        let mut pipeline = StaticPipeline::<BenchScratchpad, 10>::new(BenchScratchpad::new(10_000));
+        let mut pipeline = StaticPipeline::<BenchScratchpad, 10>::new();
         for stage_fn in static_fns.iter().take(count) {
             pipeline.add_stage(*stage_fn).unwrap();
         }
+        let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 }
@@ -227,27 +231,29 @@ mod data_volume {
 
     #[divan::bench(args = [100, 10_000, 1_000_000])]
     fn dynamic(bencher: Bencher, size: usize) {
-        let mut pipeline = DynamicPipeline::new(BenchScratchpad::new(size))
+        let mut pipeline = DynamicPipeline::new()
             .stage(NormaliseStage)
             .stage(ClampStage)
             .stage(ScaleStage);
+        let mut ctx = BenchScratchpad::new(size);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 
     #[divan::bench(args = [100, 10_000, 1_000_000])]
     fn static_pipeline(bencher: Bencher, size: usize) {
-        let mut pipeline = StaticPipeline::<BenchScratchpad, 3>::new(BenchScratchpad::new(size));
+        let mut pipeline = StaticPipeline::<BenchScratchpad, 3>::new();
         pipeline.add_stage(normalise).unwrap();
         pipeline.add_stage(clamp).unwrap();
         pipeline.add_stage(scale).unwrap();
+        let mut ctx = BenchScratchpad::new(size);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 
@@ -267,22 +273,23 @@ mod retry_overhead {
 
     #[divan::bench]
     fn plain_stage(bencher: Bencher) {
-        let mut pipeline = DynamicPipeline::new(BenchScratchpad::new(10_000)).stage(NormaliseStage);
+        let mut pipeline = DynamicPipeline::new().stage(NormaliseStage);
+        let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 
     #[divan::bench]
     fn retry_wrapped_stage(bencher: Bencher) {
-        let mut pipeline =
-            DynamicPipeline::new(BenchScratchpad::new(10_000)).stage(Retry::new(NormaliseStage, 3));
+        let mut pipeline = DynamicPipeline::new().stage(Retry::new(NormaliseStage, 3));
+        let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 }
@@ -293,7 +300,7 @@ mod mixed_stages {
 
     #[divan::bench(args = [3, 5, 10])]
     fn dynamic(bencher: Bencher, count: usize) {
-        let mut pipeline = DynamicPipeline::new(BenchScratchpad::new(10_000));
+        let mut pipeline = DynamicPipeline::new();
         for i in 0..count {
             match i % 5 {
                 0 => pipeline.add_stage(NormaliseStage),
@@ -303,10 +310,11 @@ mod mixed_stages {
                 _ => pipeline.add_stage(DeltaStage),
             }
         }
+        let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 }
@@ -317,22 +325,24 @@ mod deadline_overhead {
 
     #[divan::bench]
     fn plain_stage(bencher: Bencher) {
-        let mut pipeline = DynamicPipeline::new(BenchScratchpad::new(10_000)).stage(NormaliseStage);
+        let mut pipeline = DynamicPipeline::new().stage(NormaliseStage);
+        let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 
     #[divan::bench]
     fn deadline_wrapped_stage(bencher: Bencher) {
-        let mut pipeline = DynamicPipeline::new(BenchScratchpad::new(10_000))
-            .stage(Deadline::new(NormaliseStage, Duration::from_secs(1)));
+        let mut pipeline =
+            DynamicPipeline::new().stage(Deadline::new(NormaliseStage, Duration::from_secs(1)));
+        let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 }
@@ -341,34 +351,34 @@ mod pool_overhead {
     use super::*;
     use stages::*;
 
-    fn make_pipeline() -> StaticPipeline<BenchScratchpad, 1> {
-        let mut p = StaticPipeline::new(BenchScratchpad::new(10_000));
+    fn make_static_pipeline() -> StaticPipeline<BenchScratchpad, 1> {
+        let mut p = StaticPipeline::new();
         p.add_stage(normalise).unwrap();
         p
     }
 
-    /// Allocates a fresh scratchpad (3 × Vec<f32> of 10k elements) on every call.
-    /// This is the realistic baseline for a server that creates a pipeline per request.
+    /// Allocates a fresh scratchpad (3 x Vec<f32> of 10k elements) on every call.
+    /// This is the realistic baseline for a server that creates a scratchpad per request.
     #[divan::bench]
-    fn new_pipeline_per_call(bencher: Bencher) {
+    fn new_scratchpad_per_call(bencher: Bencher) {
+        let pipeline = make_static_pipeline();
+
         bencher.bench_local(|| {
-            let mut pipeline =
-                StaticPipeline::<BenchScratchpad, 1>::new(BenchScratchpad::new(10_000));
-            pipeline.add_stage(normalise).unwrap();
-            black_box(pipeline.run()).unwrap();
+            let mut ctx = BenchScratchpad::new(10_000);
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 
-    /// Acquires a pre-built pipeline from the pool, runs it, and returns it.
-    /// No allocation on the hot path; scratchpad Vecs are reused.
+    /// Acquires a pre-built scratchpad from the pool and returns it on drop.
+    /// No allocation on the hot path — Vec buffers are reused.
     #[divan::bench]
     fn pool_acquire_run_return(bencher: Bencher) {
-        let pool = PipelinePool::new(4, make_pipeline);
+        let pipeline = make_static_pipeline();
+        let pool = ScratchpadPool::new(4, || BenchScratchpad::new(10_000));
 
         bencher.bench_local(|| {
-            let mut guard = pool.acquire();
-            guard.context_mut().reset();
-            black_box(guard.run()).unwrap();
+            let mut ctx = pool.acquire();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 }
@@ -379,48 +389,52 @@ mod instrumentation_overhead {
 
     #[divan::bench]
     fn plain_stage(bencher: Bencher) {
-        let mut pipeline = DynamicPipeline::new(BenchScratchpad::new(10_000)).stage(NormaliseStage);
+        let mut pipeline = DynamicPipeline::new().stage(NormaliseStage);
+        let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 
     #[divan::bench]
     fn timed_stage(bencher: Bencher) {
         let metrics = StageMetrics::new("normalise");
-        let mut pipeline = DynamicPipeline::new(BenchScratchpad::new(10_000))
-            .stage(Timed::new(NormaliseStage, Arc::clone(&metrics)));
+        let mut pipeline =
+            DynamicPipeline::new().stage(Timed::new(NormaliseStage, Arc::clone(&metrics)));
+        let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 
     #[divan::bench]
     fn instrumented_stage(bencher: Bencher) {
-        let mut pipeline = DynamicPipeline::new(BenchScratchpad::new(10_000))
-            .stage(Instrumented::new(NormaliseStage, "normalise"));
+        let mut pipeline =
+            DynamicPipeline::new().stage(Instrumented::new(NormaliseStage, "normalise"));
+        let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 
     #[divan::bench]
     fn timed_and_instrumented_stage(bencher: Bencher) {
         let metrics = StageMetrics::new("normalise");
-        let mut pipeline = DynamicPipeline::new(BenchScratchpad::new(10_000)).stage(Timed::new(
+        let mut pipeline = DynamicPipeline::new().stage(Timed::new(
             Instrumented::new(NormaliseStage, "normalise"),
             Arc::clone(&metrics),
         ));
+        let mut ctx = BenchScratchpad::new(10_000);
 
         bencher.bench_local(|| {
-            pipeline.context_mut().reset();
-            black_box(pipeline.run()).unwrap();
+            ctx.reset();
+            black_box(pipeline.run(&mut ctx)).unwrap();
         });
     }
 }

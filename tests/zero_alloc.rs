@@ -4,36 +4,31 @@ use pipex::scratchpad::Scratchpad;
 use pipex::stage::Stage;
 use pipex::static_pipeline::Pipeline as StaticPipeline;
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::cell::Cell;
 
-// Tests share a global allocator, serialize them so one test's setup
-// allocations do not bleed into another test's measurement window.
-static LOCK: Mutex<()> = Mutex::new(());
-
-struct TrackingAllocator {
-    allocations: AtomicUsize,
+thread_local! {
+    static TRACKING: Cell<bool> = const { Cell::new(false) };
+    static COUNT: Cell<usize> = const { Cell::new(0) };
 }
 
-impl TrackingAllocator {
-    const fn new() -> Self {
-        Self {
-            allocations: AtomicUsize::new(0),
-        }
-    }
+struct TrackingAllocator;
 
-    fn reset(&self) {
-        self.allocations.store(0, Ordering::SeqCst);
+impl TrackingAllocator {
+    fn start(&self) {
+        TRACKING.with(|t| t.set(true));
+        COUNT.with(|c| c.set(0));
     }
 
     fn count(&self) -> usize {
-        self.allocations.load(Ordering::SeqCst)
+        COUNT.with(|c| c.get())
     }
 }
 
 unsafe impl GlobalAlloc for TrackingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        self.allocations.fetch_add(1, Ordering::SeqCst);
+        if TRACKING.try_with(|t| t.get()).unwrap_or(false) {
+            let _ = COUNT.try_with(|c| c.set(c.get() + 1));
+        }
         unsafe { System.alloc(layout) }
     }
 
@@ -43,7 +38,7 @@ unsafe impl GlobalAlloc for TrackingAllocator {
 }
 
 #[global_allocator]
-static ALLOCATOR: TrackingAllocator = TrackingAllocator::new();
+static ALLOCATOR: TrackingAllocator = TrackingAllocator;
 
 struct ZeroAllocScratchpad {
     values: Vec<f32>,
@@ -78,14 +73,13 @@ mod zero_alloc_tests {
 
     #[test]
     fn dynamic_pipeline_does_not_allocate_during_run() {
-        let _guard = LOCK.lock().unwrap();
-        let mut pipeline = DynamicPipeline::new(ZeroAllocScratchpad {
+        let mut pipeline = DynamicPipeline::new().stage(ScaleStage);
+        let mut ctx = ZeroAllocScratchpad {
             values: vec![1.0, 2.0, 3.0],
-        })
-        .stage(ScaleStage);
+        };
 
-        ALLOCATOR.reset();
-        pipeline.run().unwrap();
+        ALLOCATOR.start();
+        pipeline.run(&mut ctx).unwrap();
 
         assert_eq!(
             ALLOCATOR.count(),
@@ -96,14 +90,14 @@ mod zero_alloc_tests {
 
     #[test]
     fn static_pipeline_does_not_allocate_during_run() {
-        let _guard = LOCK.lock().unwrap();
-        let mut pipeline = StaticPipeline::<ZeroAllocScratchpad, 1>::new(ZeroAllocScratchpad {
-            values: vec![1.0, 2.0, 3.0],
-        });
+        let mut pipeline = StaticPipeline::<ZeroAllocScratchpad, 1>::new();
         pipeline.add_stage(scale).unwrap();
+        let mut ctx = ZeroAllocScratchpad {
+            values: vec![1.0, 2.0, 3.0],
+        };
 
-        ALLOCATOR.reset();
-        pipeline.run().unwrap();
+        ALLOCATOR.start();
+        pipeline.run(&mut ctx).unwrap();
 
         assert_eq!(ALLOCATOR.count(), 0, "static pipeline allocated during run");
     }

@@ -1,16 +1,14 @@
-//! Thread-safe pool of pipelines for concurrent workloads.
+//! Thread-safe pool of scratchpads for concurrent workloads.
 //!
-//! Each pipeline owns its scratchpad, so concurrent callers need separate
-//! pipeline instances rather than sharing one. `PipelinePool` manages a
-//! fixed-capacity stock of pre-built pipelines: callers [`acquire`] a
-//! [`PoolGuard`], use the pipeline, and on drop the scratchpad is reset
-//! and the pipeline is returned for the next caller.
+//! With pipelines decoupled from their scratchpad, the typical concurrent
+//! pattern is to share a single [`static_pipeline::Pipeline`] via [`Arc`] and
+//! pool only the scratchpads — one per concurrent caller.
 //!
 //! # Example
 //!
 //! ```
 //! use std::sync::Arc;
-//! use pipex::pool::PipelinePool;
+//! use pipex::pool::ScratchpadPool;
 //! use pipex::static_pipeline::Pipeline;
 //! use pipex::scratchpad::Scratchpad;
 //! use pipex::error::PipelineError;
@@ -27,136 +25,112 @@
 //!     Ok(())
 //! }
 //!
-//! let pool: Arc<PipelinePool<Pipeline<Buf, 1>>> = Arc::new(PipelinePool::new(4, || {
-//!     let mut p = Pipeline::new(Buf { value: 0.0 });
-//!     p.add_stage(double).unwrap();
-//!     p
-//! }));
+//! let mut pipeline = Pipeline::<Buf, 1>::new();
+//! pipeline.add_stage(double).unwrap();
+//! let pipeline = Arc::new(pipeline);
 //!
-//! let mut guard = pool.acquire();
-//! guard.context_mut().value = 3.0;
-//! guard.run().unwrap();
-//! assert_eq!(guard.context().value, 6.0);
-//! // pipeline is reset and returned when guard is dropped
+//! let pool = Arc::new(ScratchpadPool::new(4, || Buf { value: 0.0 }));
+//!
+//! let mut ctx = pool.acquire();
+//! ctx.value = 3.0;
+//! pipeline.run(&mut ctx).unwrap();
+//! assert_eq!(ctx.value, 6.0);
+//! // ctx drops here → scratchpad reset → returned to pool
 //! ```
-//!
-//! [`acquire`]: PipelinePool::acquire
 
 use std::ops::{Deref, DerefMut};
-use std::sync::Mutex;
 
-/// Implemented by pipeline types that can be held in a [`PipelinePool`].
-///
-/// Both [`static_pipeline::Pipeline`][crate::static_pipeline::Pipeline] and
-/// [`dynamic_pipeline::Pipeline`][crate::dynamic_pipeline::Pipeline] implement this.
-pub trait PoolablePipeline {
-    /// Resets the pipeline's scratchpad and clears cached validation state,
-    /// making it safe to re-issue to the next caller.
-    fn reset_for_reuse(&mut self);
-}
+use parking_lot::Mutex;
 
-/// A thread-safe pool of pre-built pipelines for concurrent workloads.
+use crate::scratchpad::Scratchpad;
+
+/// A thread-safe pool of scratchpads for concurrent pipeline workloads.
 ///
-/// Call [`acquire`][PipelinePool::acquire] to borrow a pipeline. The returned
-/// [`PoolGuard`] resets the pipeline and returns it to the pool on drop.
-/// When all pooled pipelines are simultaneously in use the factory closure
-/// creates a new one on demand; pipelines beyond [`capacity`][PipelinePool::capacity]
-/// are dropped on return rather than cached, bounding memory use.
-pub struct PipelinePool<P: PoolablePipeline + Send> {
-    pipelines: Mutex<Vec<P>>,
-    factory: Box<dyn Fn() -> P + Send + Sync>,
+/// Share one pipeline via [`Arc`] across all threads; each thread acquires its
+/// own [`ScratchpadGuard`] from this pool. On drop, [`Scratchpad::reset`] is
+/// called and the scratchpad is returned. Scratchpads beyond
+/// [`capacity`][ScratchpadPool::capacity] are dropped rather than cached,
+/// bounding memory use.
+pub struct ScratchpadPool<S: Scratchpad + Send> {
+    slots: Mutex<Vec<S>>,
+    factory: Box<dyn Fn() -> S + Send + Sync>,
     capacity: usize,
 }
 
-impl<P: PoolablePipeline + Send> PipelinePool<P> {
-    /// Creates a pool pre-populated with `capacity` pipelines built by `factory`.
+impl<S: Scratchpad + Send> ScratchpadPool<S> {
+    /// Creates a pool pre-populated with `capacity` scratchpads built by `factory`.
     ///
-    /// `factory` is also called whenever all pipelines are simultaneously in use.
-    pub fn new(capacity: usize, factory: impl Fn() -> P + Send + Sync + 'static) -> Self {
-        let factory: Box<dyn Fn() -> P + Send + Sync> = Box::new(factory);
-        let pipelines = (0..capacity).map(|_| factory()).collect();
+    /// `factory` is also called whenever all scratchpads are simultaneously in use.
+    pub fn new(capacity: usize, factory: impl Fn() -> S + Send + Sync + 'static) -> Self {
+        let factory: Box<dyn Fn() -> S + Send + Sync> = Box::new(factory);
+        let slots = (0..capacity).map(|_| factory()).collect();
         Self {
-            pipelines: Mutex::new(pipelines),
+            slots: Mutex::new(slots),
             factory,
             capacity,
         }
     }
 
-    /// Borrows a pipeline from the pool.
+    /// Borrows a scratchpad from the pool.
     ///
-    /// If the pool is empty a new pipeline is created via the factory. The
-    /// pipeline is reset and returned to the pool (up to capacity) when the
+    /// If the pool is empty a new scratchpad is created via the factory. The
+    /// scratchpad is reset and returned to the pool (up to capacity) when the
     /// guard is dropped.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the pool's internal mutex is poisoned (i.e. a thread panicked
-    /// while holding it).
     #[must_use]
-    pub fn acquire(&self) -> PoolGuard<'_, P> {
-        let pipeline = self
-            .pipelines
-            .lock()
-            .expect("pool mutex poisoned")
-            .pop()
-            .unwrap_or_else(|| (self.factory)());
-        PoolGuard {
-            pipeline: Some(pipeline),
+    pub fn acquire(&self) -> ScratchpadGuard<'_, S> {
+        let scratchpad = self.slots.lock().pop().unwrap_or_else(|| (self.factory)());
+        ScratchpadGuard {
+            scratchpad: Some(scratchpad),
             pool: self,
         }
     }
 
-    /// Returns the number of pipelines currently idle in the pool.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the pool's internal mutex is poisoned.
+    /// Returns the number of scratchpads currently idle in the pool.
     #[must_use]
     pub fn available(&self) -> usize {
-        self.pipelines.lock().expect("pool mutex poisoned").len()
+        self.slots.lock().len()
     }
 
-    /// Returns the maximum number of pipelines the pool will hold at rest.
+    /// Returns the maximum number of scratchpads the pool will hold at rest.
     #[must_use]
     pub fn capacity(&self) -> usize {
         self.capacity
     }
 }
 
-/// RAII guard that holds a pipeline checked out from a [`PipelinePool`].
+/// RAII guard that holds a scratchpad checked out from a [`ScratchpadPool`].
 ///
-/// Derefs to `P`, so all pipeline methods are accessible directly. On drop,
-/// [`PoolablePipeline::reset_for_reuse`] is called and the pipeline is
-/// returned to the pool (provided the pool is not already at capacity).
-pub struct PoolGuard<'a, P: PoolablePipeline + Send> {
-    pipeline: Option<P>,
-    pool: &'a PipelinePool<P>,
+/// Derefs to `S`, giving direct access to the scratchpad. On drop,
+/// [`Scratchpad::reset`] is called and the scratchpad is returned to the pool
+/// (provided the pool is not already at capacity).
+pub struct ScratchpadGuard<'a, S: Scratchpad + Send> {
+    scratchpad: Option<S>,
+    pool: &'a ScratchpadPool<S>,
 }
 
-impl<P: PoolablePipeline + Send> Drop for PoolGuard<'_, P> {
+impl<S: Scratchpad + Send> Drop for ScratchpadGuard<'_, S> {
     fn drop(&mut self) {
-        if let Some(mut pipeline) = self.pipeline.take() {
-            pipeline.reset_for_reuse();
-            if let Ok(mut guard) = self.pool.pipelines.lock() {
-                if guard.len() < self.pool.capacity {
-                    guard.push(pipeline);
-                }
+        if let Some(mut scratchpad) = self.scratchpad.take() {
+            scratchpad.reset();
+            let mut slots = self.pool.slots.lock();
+            if slots.len() < self.pool.capacity {
+                slots.push(scratchpad);
             }
         }
     }
 }
 
-impl<P: PoolablePipeline + Send> Deref for PoolGuard<'_, P> {
-    type Target = P;
+impl<S: Scratchpad + Send> Deref for ScratchpadGuard<'_, S> {
+    type Target = S;
 
     fn deref(&self) -> &Self::Target {
-        self.pipeline.as_ref().expect("guard used after drop")
+        self.scratchpad.as_ref().expect("guard used after drop")
     }
 }
 
-impl<P: PoolablePipeline + Send> DerefMut for PoolGuard<'_, P> {
+impl<S: Scratchpad + Send> DerefMut for ScratchpadGuard<'_, S> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.pipeline.as_mut().expect("guard used after drop")
+        self.scratchpad.as_mut().expect("guard used after drop")
     }
 }
 
@@ -164,7 +138,6 @@ impl<P: PoolablePipeline + Send> DerefMut for PoolGuard<'_, P> {
 mod tests {
     use super::*;
     use crate::error::PipelineError;
-    use crate::scratchpad::Scratchpad;
     use crate::static_pipeline::Pipeline;
 
     struct Buf {
@@ -194,21 +167,21 @@ mod tests {
     }
 
     fn make_pipeline() -> Pipeline<Buf, 1> {
-        let mut p = Pipeline::new(Buf::new(0.0));
+        let mut p = Pipeline::new();
         p.add_stage(double).unwrap();
         p
     }
 
     #[test]
     fn pool_pre_populates_to_capacity() {
-        let pool: PipelinePool<Pipeline<Buf, 1>> = PipelinePool::new(4, make_pipeline);
+        let pool: ScratchpadPool<Buf> = ScratchpadPool::new(4, || Buf::new(0.0));
         assert_eq!(pool.available(), 4);
         assert_eq!(pool.capacity(), 4);
     }
 
     #[test]
     fn acquire_reduces_available_count() {
-        let pool: PipelinePool<Pipeline<Buf, 1>> = PipelinePool::new(2, make_pipeline);
+        let pool: ScratchpadPool<Buf> = ScratchpadPool::new(2, || Buf::new(0.0));
         let _g1 = pool.acquire();
         assert_eq!(pool.available(), 1);
         let _g2 = pool.acquire();
@@ -216,8 +189,8 @@ mod tests {
     }
 
     #[test]
-    fn drop_returns_pipeline_to_pool() {
-        let pool: PipelinePool<Pipeline<Buf, 1>> = PipelinePool::new(1, make_pipeline);
+    fn drop_returns_scratchpad_to_pool() {
+        let pool: ScratchpadPool<Buf> = ScratchpadPool::new(1, || Buf::new(0.0));
         {
             let _guard = pool.acquire();
             assert_eq!(pool.available(), 0);
@@ -226,59 +199,59 @@ mod tests {
     }
 
     #[test]
-    fn acquired_pipeline_runs_correctly() {
-        let pool: PipelinePool<Pipeline<Buf, 1>> = PipelinePool::new(1, make_pipeline);
-        let mut guard = pool.acquire();
-        guard.context_mut().value = 3.0;
-        guard.run().unwrap();
-        assert_eq!(guard.context().value, 6.0);
+    fn pipeline_runs_correctly_with_pooled_scratchpad() {
+        let pipeline = make_pipeline();
+        let pool: ScratchpadPool<Buf> = ScratchpadPool::new(1, || Buf::new(0.0));
+        let mut ctx = pool.acquire();
+        ctx.value = 3.0;
+        pipeline.run(&mut ctx).unwrap();
+        assert_eq!(ctx.value, 6.0);
     }
 
     #[test]
     fn scratchpad_is_reset_on_return() {
-        let pool: PipelinePool<Pipeline<Buf, 1>> = PipelinePool::new(1, make_pipeline);
+        let pool: ScratchpadPool<Buf> = ScratchpadPool::new(1, || Buf::new(0.0));
         {
-            let mut guard = pool.acquire();
-            guard.context_mut().value = 99.0;
-            guard.run().unwrap();
+            let mut ctx = pool.acquire();
+            ctx.value = 99.0;
         }
-        let guard = pool.acquire();
-        assert_eq!(guard.context().value, 0.0);
+        let ctx = pool.acquire();
+        assert_eq!(ctx.value, 0.0);
     }
 
     #[test]
-    fn validation_reruns_after_return() {
-        let pool: PipelinePool<Pipeline<Buf, 1>> = PipelinePool::new(1, make_pipeline);
+    fn validation_runs_on_each_acquisition() {
+        let pipeline = make_pipeline();
+        let pool: ScratchpadPool<Buf> = ScratchpadPool::new(1, || Buf::new(0.0));
         {
-            let mut guard = pool.acquire();
-            guard.context_mut().value = 2.0;
-            guard.run().unwrap();
+            let mut ctx = pool.acquire();
+            ctx.value = 2.0;
+            pipeline.run(&mut ctx).unwrap();
         }
-        let mut guard = pool.acquire();
-        guard.context_mut().valid = false;
+        let mut ctx = pool.acquire();
+        ctx.valid = false;
         assert!(matches!(
-            guard.run(),
+            pipeline.run(&mut ctx),
             Err(PipelineError::ValidationFailed(_))
         ));
     }
 
     #[test]
-    fn factory_creates_pipeline_when_pool_exhausted() {
-        let pool: PipelinePool<Pipeline<Buf, 1>> = PipelinePool::new(1, make_pipeline);
+    fn factory_creates_scratchpad_when_pool_exhausted() {
+        let pool: ScratchpadPool<Buf> = ScratchpadPool::new(1, || Buf::new(0.0));
         let _g1 = pool.acquire();
         let mut g2 = pool.acquire();
-        g2.context_mut().value = 2.0;
-        g2.run().unwrap();
-        assert_eq!(g2.context().value, 4.0);
+        g2.value = 2.0;
+        assert_eq!(g2.value, 2.0);
     }
 
     #[test]
-    fn overflow_pipeline_is_dropped_not_returned() {
-        let pool: PipelinePool<Pipeline<Buf, 1>> = PipelinePool::new(1, make_pipeline);
+    fn overflow_scratchpad_is_dropped_not_returned() {
+        let pool: ScratchpadPool<Buf> = ScratchpadPool::new(1, || Buf::new(0.0));
         let g1 = pool.acquire();
-        let g2 = pool.acquire(); // overflow, comes from factory
-        drop(g1); // returned (available = 1, at capacity)
-        drop(g2); // dropped, would exceed capacity
+        let g2 = pool.acquire();
+        drop(g1);
+        drop(g2);
         assert_eq!(pool.available(), 1);
     }
 
@@ -286,15 +259,18 @@ mod tests {
     fn pool_is_usable_across_threads() {
         use std::sync::Arc;
 
-        let pool = Arc::new(PipelinePool::new(4, make_pipeline));
+        let pipeline = Arc::new(make_pipeline());
+        let pool = Arc::new(ScratchpadPool::new(4, || Buf::new(0.0)));
+
         let handles: Vec<_> = (0..8)
             .map(|_| {
+                let pipeline = Arc::clone(&pipeline);
                 let pool = Arc::clone(&pool);
                 std::thread::spawn(move || {
-                    let mut guard = pool.acquire();
-                    guard.context_mut().value = 2.0;
-                    guard.run().unwrap();
-                    assert_eq!(guard.context().value, 4.0);
+                    let mut ctx = pool.acquire();
+                    ctx.value = 2.0;
+                    pipeline.run(&mut ctx).unwrap();
+                    assert_eq!(ctx.value, 4.0);
                 })
             })
             .collect();

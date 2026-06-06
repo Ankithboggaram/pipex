@@ -43,10 +43,9 @@ use crate::stage::Stage;
 ///     }
 /// }
 ///
-/// let mut pipeline = Pipeline::new(MyScratchpad)
-///     .stage(Deadline::new(FastStage, Duration::from_millis(100)));
-///
-/// assert!(pipeline.run().is_ok());
+/// let mut pipeline = Pipeline::new().stage(Deadline::new(FastStage, Duration::from_millis(100)));
+/// let mut ctx = MyScratchpad;
+/// assert!(pipeline.run(&mut ctx).is_ok());
 /// ```
 #[derive(Debug)]
 pub struct Deadline<S: Scratchpad, T: Stage<S>> {

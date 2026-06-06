@@ -45,15 +45,16 @@ impl Stage<Buf> for Double {
     }
 }
 
-let mut pipeline = Pipeline::new(Buf { value: 3.0 }).stage(Double);
-pipeline.run().unwrap();
-assert_eq!(pipeline.context().value, 6.0);
+let mut pipeline = Pipeline::new().stage(Double);
+let mut ctx = Buf { value: 3.0 };
+pipeline.run(&mut ctx).unwrap();
+assert_eq!(ctx.value, 6.0);
 ```
 
 Two pipeline variants:
 
 - **Dynamic** (`dynamic_pipeline::Pipeline`): stages as `Box<dyn Stage<S>>`, configured at runtime.
-- **Static** (`static_pipeline::Pipeline<S, N>`): stages as function pointers in a fixed array, zero allocation after setup.
+- **Static** (`static_pipeline::Pipeline<S, N>`): stages as function pointers in a fixed array, zero allocation after setup. Takes `&self` on `run` — share one instance across threads via `Arc`.
 
 ---
 
@@ -84,31 +85,33 @@ let snapshot = pm.snapshot();
 
 ## Pooling
 
-Each pipeline owns its scratchpad, so concurrent callers each need their own instance. `PipelinePool` keeps a fixed stock of pre-built pipelines with no allocation on the hot path.
+The static pipeline is stateless after setup, so a single `Arc<Pipeline>` can be shared across all threads. Pool only the scratchpads — one per concurrent caller.
 
-The factory closure is called once per slot at startup (and on demand if all pipelines are in use). `acquire()` checks out a pipeline; dropping the guard resets the scratchpad and returns it.
+The factory closure is called once per slot at startup (and on demand if all scratchpads are in use). `acquire()` checks out a scratchpad; dropping the guard resets it and returns it to the pool.
 
 ```rust
 use std::sync::Arc;
-use pipex::pool::PipelinePool;
+use pipex::pool::ScratchpadPool;
 use pipex::static_pipeline::Pipeline;
 
-// Build a pool of 4 pipelines, each wired with the Double stage.
-let pool = Arc::new(PipelinePool::new(4, || {
-    let mut p = Pipeline::new(Buf { value: 0.0 });
-    p.add_stage(double).unwrap();
-    p
-}));
+// One pipeline shared across all threads.
+let mut pipeline = Pipeline::<Buf, 1>::new();
+pipeline.add_stage(double).unwrap();
+let pipeline = Arc::new(pipeline);
 
-// Spawn 8 threads, each borrowing a pipeline from the shared pool.
+// Pool of scratchpads — one per concurrent caller.
+let pool = Arc::new(ScratchpadPool::new(4, || Buf { value: 0.0 }));
+
+// Spawn 8 threads, each borrowing a scratchpad from the pool.
 for _ in 0..8 {
+    let pipeline = Arc::clone(&pipeline);
     let pool = Arc::clone(&pool);
     std::thread::spawn(move || {
-        let mut guard = pool.acquire();    // borrows a pipeline
-        guard.context_mut().value = 3.0;  // write input
-        guard.run().unwrap();              // execute stages
-        assert_eq!(guard.context().value, 6.0);
-        // guard drops here → scratchpad reset → pipeline returned
+        let mut ctx = pool.acquire();  // borrows a scratchpad
+        ctx.value = 3.0;              // write input
+        pipeline.run(&mut ctx).unwrap();
+        assert_eq!(ctx.value, 6.0);
+        // ctx drops here → scratchpad reset → returned to pool
     });
 }
 ```
@@ -123,20 +126,20 @@ Measured on Apple Silicon using [divan](https://github.com/nvzqz/divan). All tim
 
 | Data size | Dynamic | Static | Naive | vs Naive |
 |---|---|---|---|---|
-| 100 | 16 ns | 16 ns | 66 ns | ~4.1x |
-| 10,000 | 1.6 µs | 1.1 µs | 2.5 µs | ~2.4x |
-| 1,000,000 | 97 µs | 95 µs | 237 µs | ~2.5x |
+| 100 | 17 ns | 17 ns | 64 ns | ~3.9x |
+| 10,000 | 1.6 µs | 1.1 µs | 2.4 µs | ~2.2x |
+| 1,000,000 | 97 µs | 97 µs | 237 µs | ~2.4x |
 
 **Pipeline cost scales linearly with stage count** (10,000 elements)
 
 | Stages | Dynamic | Static |
 |---|---|---|
-| 1 | 1.4 µs | 1.6 µs |
-| 5 | 8.0 µs | 7.8 µs |
-| 10 | 15.6 µs | 14.8 µs |
+| 1 | 1.6 µs | 1.4 µs |
+| 5 | 7.8 µs | 7.8 µs |
+| 10 | 15.0 µs | 15.0 µs |
 
-- `Timed` adds ~80 ns per stage. `Instrumented`, `Deadline`, and `Retry` (no retries triggered) are zero-cost.
-- Pool acquire+run+return (~1.9 µs) is ~1.7x faster than creating a new pipeline per request (~3.2 µs).
+- `Timed` adds ~75 ns per stage. `Instrumented`, `Deadline`, and `Retry` (no retries triggered) are zero-cost.
+- Pool acquire+run+return (~1.3 µs) is ~2.5x faster than allocating a new scratchpad per request (~3.3 µs).
 
 ---
 
@@ -145,4 +148,3 @@ Measured on Apple Silicon using [divan](https://github.com/nvzqz/divan). All tim
 - [ ] Type chaining for full compiler inlining across stage boundaries
 - [ ] Parallel stage execution
 - [ ] Arena allocation
-- [ ] Task graphs
