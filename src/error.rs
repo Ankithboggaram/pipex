@@ -1,4 +1,9 @@
-//! Error types for pipeline execution.
+//! Error type for pipeline execution failures.
+//!
+//! [`PipelineError`] is `#[non_exhaustive]`: always include a wildcard arm
+//! when matching to remain compatible with future variants. For chained errors
+//! such as [`PipelineError::RetryExhausted`], the original error is accessible
+//! via [`std::error::Error::source`].
 
 /// Represents errors that can occur during pipeline execution.
 #[derive(Debug)]

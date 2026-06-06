@@ -1,4 +1,8 @@
-//! Lock-free per-stage metrics with rolling window percentiles.
+//! Lock-free per-stage timing metrics with rolling-window percentiles.
+//!
+//! Wrap any stage in [`Timed`] to record nanosecond execution latency with no
+//! locking. Use [`PipelineMetrics`] to aggregate metrics from multiple stages
+//! into a single [`PipelineSnapshot`] for dashboards and alerting.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};

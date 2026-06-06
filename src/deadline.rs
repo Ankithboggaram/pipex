@@ -1,4 +1,8 @@
-//! Deadline wrapper for enforcing per-stage time budgets.
+//! Deadline wrapper for surfacing latency violations as pipeline errors.
+//!
+//! [`Deadline`] is a post-hoc guard, not a preemptive timeout: the stage runs
+//! to completion and elapsed time is checked afterwards. Use it for SLA
+//! enforcement and circuit-breaking, not for aborting slow stages mid-flight.
 
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};

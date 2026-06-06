@@ -1,4 +1,8 @@
-//! Tracing span instrumentation wrapper for pipeline stages.
+//! Tracing span instrumentation for pipeline stages.
+//!
+//! Wrap any stage in [`Instrumented`] to emit a [`tracing`] span on every
+//! execution. The span name is derived from [`Stage::name`][crate::stage::Stage]
+//! and routed to whatever subscriber the application configures.
 
 use crate::error::PipelineError;
 use crate::scratchpad::Scratchpad;

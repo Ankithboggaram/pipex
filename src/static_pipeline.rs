@@ -1,4 +1,12 @@
-//! Static pipeline executor using function pointers for zero heap allocation.
+//! Zero-allocation concurrent pipeline backed by function pointers.
+//!
+//! The primary recommendation for hot-path workloads. `run` takes `&self`, so
+//! a single pipeline can be shared across threads via
+//! [`Arc`][std::sync::Arc] while each thread supplies its own scratchpad from
+//! a [`pool::ScratchpadPool`][crate::pool::ScratchpadPool]. Stages must be
+//! bare `fn` pointers; wrappers (`Timed`, `Retry`, etc.) are not supported.
+//! Use a tuple chain ([`chain`][crate::chain]) if you need per-stage
+//! instrumentation on a single-threaded workload.
 
 use crate::error::PipelineError;
 use crate::scratchpad::Scratchpad;

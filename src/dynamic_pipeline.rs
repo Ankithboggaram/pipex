@@ -1,4 +1,11 @@
-//! Dynamic pipeline executor using boxed trait objects for runtime flexibility.
+//! Runtime-composed pipeline backed by boxed trait objects.
+//!
+//! Use when stage types are not known at compile time: plugin systems,
+//! config-driven pipelines, and test harnesses. For pipelines where all stages
+//! are known at compile time, a tuple chain ([`chain`][crate::chain]) has no
+//! heap allocation and no dynamic dispatch. For concurrent workloads where one
+//! pipeline is shared across threads, use
+//! [`static_pipeline::Pipeline`][crate::static_pipeline::Pipeline].
 
 use crate::error::PipelineError;
 use crate::scratchpad::Scratchpad;
@@ -20,14 +27,24 @@ use crate::stage::Stage;
 /// ```
 /// use pipex::dynamic_pipeline::Pipeline;
 /// use pipex::scratchpad::Scratchpad;
+/// use pipex::stage::Stage;
+/// use pipex::error::PipelineError;
 ///
-/// struct MyScratchpad;
+/// struct Buf { value: f32 }
+/// impl Scratchpad for Buf { fn reset(&mut self) { self.value = 0.0; } }
 ///
-/// impl Scratchpad for MyScratchpad {
-///     fn reset(&mut self) {}
+/// struct Double;
+/// impl Stage<Buf> for Double {
+///     fn run(&mut self, ctx: &mut Buf) -> Result<(), PipelineError> {
+///         ctx.value *= 2.0;
+///         Ok(())
+///     }
 /// }
 ///
-/// let pipeline: Pipeline<MyScratchpad> = Pipeline::new();
+/// let mut pipeline = Pipeline::new().stage(Double);
+/// let mut ctx = Buf { value: 3.0 };
+/// pipeline.run(&mut ctx).unwrap();
+/// assert_eq!(ctx.value, 6.0);
 /// ```
 pub struct Pipeline<S: Scratchpad> {
     stages: Vec<Box<dyn Stage<S>>>,

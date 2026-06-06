@@ -1,4 +1,8 @@
-//! Retry wrapper for individual pipeline stages.
+//! Retry wrapper for transient stage failures.
+//!
+//! [`Retry`] snapshots the scratchpad before each attempt and restores it on
+//! failure, so retries are transparent to earlier stages. Requires `S: Clone`
+//! and allocates on every attempt; not suitable for zero-allocation hot paths.
 
 use crate::error::PipelineError;
 use crate::scratchpad::Scratchpad;
