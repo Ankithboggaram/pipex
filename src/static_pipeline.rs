@@ -20,6 +20,13 @@ type StageFn<S> = fn(&mut S) -> Result<(), PipelineError>;
 /// Aligned to 64 bytes (one cache line) so the function pointer array is
 /// read from a clean cache-line boundary on every `run()` call.
 ///
+/// # Function pointer constraint
+///
+/// Stages must be bare `fn` pointers (`fn(&mut S) -> Result<(), PipelineError>`),
+/// not closures. Closures that capture state cannot be coerced to `fn` and will
+/// not compile. If you need stateful stages or runtime composition, use
+/// [`dynamic_pipeline::Pipeline`][crate::dynamic_pipeline::Pipeline] instead.
+///
 /// # Example
 /// ```
 /// use pipex::static_pipeline::Pipeline;

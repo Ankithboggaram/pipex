@@ -8,6 +8,15 @@ use crate::scratchpad::Scratchpad;
 /// Each stage receives a mutable reference to the scratchpad,
 /// reads what it needs, and writes its output back in place.
 ///
+/// # Send requirement
+///
+/// This trait requires [`Send`] because the standard usage model is a single
+/// `Arc<Pipeline>` shared across threads backed by a
+/// [`ScratchpadPool`][crate::pool::ScratchpadPool]. The pipeline travels
+/// between threads, so its stages must be `Send`. Types that contain
+/// [`std::rc::Rc`] or [`std::cell::RefCell`] are not `Send` and cannot be
+/// used as stages.
+///
 /// # Example
 /// ```
 /// use pipex::stage::Stage;
