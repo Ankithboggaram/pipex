@@ -1,6 +1,7 @@
 # pipex
 
-pipex is a zero-allocation stage executor for deterministic workloads. Stages transform a shared scratchpad buffer in sequence: data lives in the scratchpad, and the pipeline is reusable logic.
+pipex is a zero-allocation stage executor for deterministic workloads. 
+It executes a fixed sequence of stages over a shared scratchpad, where all intermediate state is stored and mutated in place. Pipelines are reusable execution units that run in strict order.
 
 ---
 
