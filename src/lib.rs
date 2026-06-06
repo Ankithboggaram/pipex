@@ -54,8 +54,12 @@
 //!   workloads.
 //! - [`dynamic_pipeline::Pipeline`] : stages as `Box<dyn Stage<S>>`, configured at
 //!   runtime. Use for plugin systems, test harnesses, and configurable pipelines.
+//! - **Tuple chain** ([`chain`]) : a tuple of stages is itself a [`Stage<S>`][stage::Stage].
+//!   All stage state is stored inline with no heap allocation and no capacity constant.
+//!   Wrappers compose naturally as tuple elements:
+//!   `(Normalise, Timed::new(Clamp, metrics), Retry::new(Scale, 3))`.
 //!
-//! Both borrow the scratchpad at run time: `pipeline.run(&mut ctx)`.
+//! All three borrow the scratchpad at run time: `pipeline.run(&mut ctx)`.
 //!
 //! # Composable wrappers
 //!
@@ -80,7 +84,6 @@
 //! ```rust
 //! use pipex::scratchpad::Scratchpad;
 //! use pipex::stage::Stage;
-//! use pipex::dynamic_pipeline::Pipeline;
 //! use pipex::error::PipelineError;
 //!
 //! struct Buffer {
@@ -93,6 +96,7 @@
 //! }
 //!
 //! struct Normalise;
+//! struct Clamp;
 //!
 //! impl Stage<Buffer> for Normalise {
 //!     fn run(&mut self, ctx: &mut Buffer) -> Result<(), PipelineError> {
@@ -102,11 +106,19 @@
 //!     }
 //! }
 //!
-//! let mut pipeline = Pipeline::new().stage(Normalise);
+//! impl Stage<Buffer> for Clamp {
+//!     fn run(&mut self, ctx: &mut Buffer) -> Result<(), PipelineError> {
+//!         ctx.output.iter_mut().for_each(|x| *x = x.clamp(0.0, 1.0));
+//!         Ok(())
+//!     }
+//! }
+//!
+//! let mut pipeline = (Normalise, Clamp);
 //! let mut ctx = Buffer { values: vec![1.0, 2.0, 4.0], output: vec![0.0; 3] };
 //! pipeline.run(&mut ctx).unwrap();
 //! ```
 
+pub mod chain;
 pub mod deadline;
 pub mod dynamic_pipeline;
 pub mod error;

@@ -17,7 +17,7 @@ pipex = { git = "https://github.com/Ankithboggaram/pipex" }
 
 ## Usage
 
-Define a scratchpad (your shared state), implement stages, run:
+Define a scratchpad (your shared state), implement stages, then compose them:
 
 ```rust
 use pipex::dynamic_pipeline::Pipeline;
@@ -59,14 +59,19 @@ impl Stage<Buf> for Clamp {
     }
 }
 
-let mut pipeline = Pipeline::new().stage(Normalise).stage(Clamp);
+// Tuple chain: stages known at compile time, no dynamic dispatch.
+let mut pipeline = (Normalise, Clamp);
+
+// Dynamic pipeline: for runtime composition or mixed stage types.
+// let mut pipeline = Pipeline::new().stage(Normalise).stage(Clamp);
+
 let mut ctx = Buf {
     samples: vec![0.5, 2.0, 1.0, 3.0],
 };
 pipeline.run(&mut ctx).unwrap();
 ```
 
-For zero-allocation hot paths and concurrent workloads, use `static_pipeline::Pipeline`. Stages are bare function pointers in a fixed-size array; `run` takes `&self`, so a single `Arc<Pipeline>` serves all threads. Pair with `ScratchpadPool` for per-thread buffer reuse:
+For concurrent workloads where a single pipeline is shared across threads, use `static_pipeline::Pipeline`. Stages are bare function pointers in a fixed-size array; `run` takes `&self`, so a single `Arc<Pipeline>` serves all threads. Pair with `ScratchpadPool` for per-thread buffer reuse:
 
 ```rust
 use pipex::error::PipelineError;
@@ -117,7 +122,38 @@ pipeline.run(&mut ctx).unwrap();
 | `Instrumented::new(stage)` | Emit a [`tracing`](https://docs.rs/tracing) span per execution |
 | `Deadline::new(stage, duration)` | Fail if stage exceeds its time budget |
 
-Wrappers compose: `Timed::new(Instrumented::new(stage), metrics)`.
+Wrappers are stages and compose freely as tuple elements:
+
+```rust
+use pipex::metrics::{StageMetrics, Timed};
+use pipex::retry::Retry;
+
+let metrics = StageMetrics::new("clamp");
+let mut pipeline = (Normalise, Timed::new(Clamp, metrics), Retry::new(Clamp, 3));
+pipeline.run(&mut ctx).unwrap();
+```
+
+---
+
+## Choosing a pipeline model
+
+There are three models. The right choice depends on whether you need sharing across threads or per-stage observability.
+
+| | Static pipeline | Tuple chain | Dynamic pipeline |
+|---|---|---|---|
+| Stage types | `fn` pointers only | Any `Stage<S>` | Any `Stage<S>` |
+| `run` signature | `&self` | `&mut self` | `&mut self` |
+| `Arc` sharing without `Mutex` | Yes | No | No |
+| Wrappers (`Timed`, `Retry`, ...) | No | Yes | Yes |
+| Per-stage observability | No | Yes | Yes |
+| Runtime composition | No | No | Yes |
+| Allocation during `run` | None | None | None |
+
+**Use the static pipeline** when throughput is the priority and a single pipeline instance must be shared across many threads via `Arc`. You give up wrappers and per-stage metrics. Measure latency outside the pipeline if needed.
+
+**Use a tuple chain** when you need wrappers or per-stage timing and each thread owns its pipeline. All stage state is inline — no heap allocation, no dynamic dispatch. This is the right model for most single-threaded or per-thread workloads.
+
+**Use the dynamic pipeline** when the pipeline is assembled at runtime — plugin systems, config-driven pipelines, or test harnesses where stage types vary.
 
 ---
 

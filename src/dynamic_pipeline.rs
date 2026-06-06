@@ -7,8 +7,10 @@ use crate::stage::Stage;
 /// A pipeline that stores stages as boxed trait objects, allowing different
 /// stage types to be mixed at runtime.
 ///
-/// Uses dynamic dispatch via `Box<dyn Stage<S>>`. For a zero heap allocation
-/// alternative with stages known at compile time, see
+/// Uses dynamic dispatch via `Box<dyn Stage<S>>`. When all stages are known at
+/// compile time, prefer a tuple of stages (see [`chain`][crate::chain]) for
+/// zero heap allocation and no dynamic dispatch. For concurrent workloads where
+/// a single pipeline is shared across threads via `Arc`, see
 /// [`static_pipeline::Pipeline`][crate::static_pipeline::Pipeline].
 ///
 /// The pipeline holds no data; stages are run by passing a mutable scratchpad
