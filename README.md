@@ -14,7 +14,7 @@ Individual pipeline stages transform a shared scratchpad in sequence. The pipeli
 
 ```toml
 [dependencies]
-pipex = { git = "https://github.com/Ankithboggaram/pipex" }
+pipex = "0.2"
 ```
 
 ---
@@ -159,13 +159,13 @@ There are three models. The right choice depends on whether you need sharing acr
 
 **Use a tuple chain** when you need wrappers or per-stage timing and each thread owns its pipeline. All stage state is inline: no heap allocation, no dynamic dispatch. This is the right model for most single-threaded or per-thread workloads.
 
-**Use the dynamic pipeline** when the pipeline is assembled at runtime — plugin systems, config-driven pipelines, or test harnesses where stage types vary.
+**Use the dynamic pipeline** when the pipeline is assembled at runtime. Plugin systems, config-driven pipelines, or test harnesses where stage types vary. Stages are heap-allocated at construction time; `run` itself allocates nothing.
 
 ---
 
 ## Performance
 
-Measured on Apple Silicon using [divan](https://github.com/nvzqz/divan). All timings are medians. Three stages (normalise, clamp, scale) over varying buffer sizes.
+Measured on Apple M4 Pro, Rust 1.85, `cargo bench`. All timings are medians. Three stages (normalise, clamp, scale) over varying buffer sizes.
 
 | Data size | Hand-written | Static | Dynamic | Static + Timed |
 |---|---|---|---|---|

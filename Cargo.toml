@@ -9,7 +9,7 @@ repository = "https://github.com/Ankithboggaram/pipex"
 homepage = "https://github.com/Ankithboggaram/pipex"
 readme = "README.md"
 keywords = ["pipeline", "zero-allocation", "real-time", "embedded", "inference"]
-categories = ["data-structures", "embedded", "concurrency"]
+categories = ["embedded", "concurrency", "rust-patterns"]
 
 [package.metadata.docs.rs]
 all-features = false
