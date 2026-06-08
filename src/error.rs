@@ -14,7 +14,9 @@ pub enum PipelineError {
     /// `stage` is the name of the stage type or function that failed.
     /// `message` describes what went wrong.
     StageFailed {
+        /// Name of the stage type or function that failed.
         stage: &'static str,
+        /// Human-readable description of what went wrong.
         message: String,
     },
 
@@ -29,7 +31,9 @@ pub enum PipelineError {
     /// `context` identifies where the unexpected state was detected.
     /// `message` describes what was wrong.
     InvalidState {
+        /// Identifies where the unexpected state was detected.
         context: &'static str,
+        /// Human-readable description of what was wrong.
         message: String,
     },
 
@@ -38,14 +42,21 @@ pub enum PipelineError {
     /// Carries the number of attempts made and the last error returned by the stage.
     /// The original error is accessible via [`std::error::Error::source`].
     RetryExhausted {
+        /// Total number of attempts made before giving up.
         attempts: u32,
+        /// The last error returned by the stage.
         source: Box<PipelineError>,
     },
 
     /// A stage completed successfully but exceeded its time budget.
     ///
     /// Carries the budget and actual elapsed time, both in nanoseconds.
-    DeadlineExceeded { budget_ns: u64, elapsed_ns: u64 },
+    DeadlineExceeded {
+        /// Time budget in nanoseconds.
+        budget_ns: u64,
+        /// Actual elapsed time in nanoseconds.
+        elapsed_ns: u64,
+    },
 }
 
 impl std::fmt::Display for PipelineError {

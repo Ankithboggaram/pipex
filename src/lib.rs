@@ -118,6 +118,8 @@
 //! pipeline.run(&mut ctx).unwrap();
 //! ```
 
+#![warn(missing_docs)]
+
 pub mod chain;
 pub mod deadline;
 pub mod dynamic_pipeline;
