@@ -25,11 +25,11 @@ use crate::stage::Stage;
 ///
 /// # Example
 /// ```
-/// use pipex::deadline::Deadline;
-/// use pipex::dynamic_pipeline::Pipeline;
-/// use pipex::scratchpad::Scratchpad;
-/// use pipex::stage::Stage;
-/// use pipex::error::PipelineError;
+/// use pipexec::deadline::Deadline;
+/// use pipexec::dynamic_pipeline::Pipeline;
+/// use pipexec::scratchpad::Scratchpad;
+/// use pipexec::stage::Stage;
+/// use pipexec::error::PipelineError;
 /// use std::time::Duration;
 ///
 /// struct MyScratchpad;

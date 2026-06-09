@@ -25,10 +25,10 @@ use crate::stage::Stage;
 ///
 /// # Example
 /// ```
-/// use pipex::dynamic_pipeline::Pipeline;
-/// use pipex::scratchpad::Scratchpad;
-/// use pipex::stage::Stage;
-/// use pipex::error::PipelineError;
+/// use pipexec::dynamic_pipeline::Pipeline;
+/// use pipexec::scratchpad::Scratchpad;
+/// use pipexec::stage::Stage;
+/// use pipexec::error::PipelineError;
 ///
 /// struct Buf { value: f32 }
 /// impl Scratchpad for Buf { fn reset(&mut self) { self.value = 0.0; } }

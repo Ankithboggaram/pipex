@@ -7,10 +7,10 @@
 
 use std::sync::Arc;
 
-use pipex::error::PipelineError;
-use pipex::pool::ScratchpadPool;
-use pipex::scratchpad::Scratchpad;
-use pipex::static_pipeline::Pipeline;
+use pipexec::error::PipelineError;
+use pipexec::pool::ScratchpadPool;
+use pipexec::scratchpad::Scratchpad;
+use pipexec::static_pipeline::Pipeline;
 
 const BUFFER_SIZE: usize = 1024;
 

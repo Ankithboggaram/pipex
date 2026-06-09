@@ -5,10 +5,10 @@
 //!
 //! Run with: cargo run --example dynamic_pipeline
 
-use pipex::dynamic_pipeline::Pipeline;
-use pipex::error::PipelineError;
-use pipex::scratchpad::Scratchpad;
-use pipex::stage::Stage;
+use pipexec::dynamic_pipeline::Pipeline;
+use pipexec::error::PipelineError;
+use pipexec::scratchpad::Scratchpad;
+use pipexec::stage::Stage;
 
 struct Buf {
     samples: Vec<f32>,

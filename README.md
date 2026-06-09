@@ -1,7 +1,7 @@
-# pipex
+# pipexec
 
-[![crates.io](https://img.shields.io/crates/v/pipex.svg)](https://crates.io/crates/pipex)
-[![docs.rs](https://docs.rs/pipex/badge.svg)](https://docs.rs/pipex)
+[![crates.io](https://img.shields.io/crates/v/pipexec.svg)](https://crates.io/crates/pipexec)
+[![docs.rs](https://docs.rs/pipexec/badge.svg)](https://docs.rs/pipexec)
 [![CI](https://github.com/Ankithboggaram/pipex/actions/workflows/ci.yml/badge.svg)](https://github.com/Ankithboggaram/pipex/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![MSRV](https://img.shields.io/badge/rustc-1.85+-orange.svg)](rust-toolchain.toml)
@@ -16,7 +16,7 @@ Individual pipeline stages transform a shared scratchpad in sequence. The pipeli
 
 ```toml
 [dependencies]
-pipex = "0.3"
+pipexec = "0.3"
 ```
 
 ---
@@ -26,10 +26,10 @@ pipex = "0.3"
 Define a scratchpad (your shared state), implement stages, then compose them:
 
 ```rust
-use pipex::dynamic_pipeline::Pipeline;
-use pipex::error::PipelineError;
-use pipex::scratchpad::Scratchpad;
-use pipex::stage::Stage;
+use pipexec::dynamic_pipeline::Pipeline;
+use pipexec::error::PipelineError;
+use pipexec::scratchpad::Scratchpad;
+use pipexec::stage::Stage;
 
 struct Buf {
     samples: Vec<f32>,
@@ -80,9 +80,9 @@ pipeline.run(&mut ctx).unwrap();
 For concurrent workloads where a single pipeline is shared across threads, use `static_pipeline::Pipeline`. Stages are bare function pointers in a fixed-size array; `run` takes `&self`, so a single `Arc<Pipeline>` serves all threads. Pair with `ScratchpadPool` for per-thread buffer reuse:
 
 ```rust
-use pipex::error::PipelineError;
-use pipex::pool::ScratchpadPool;
-use pipex::static_pipeline::Pipeline;
+use pipexec::error::PipelineError;
+use pipexec::pool::ScratchpadPool;
+use pipexec::static_pipeline::Pipeline;
 use std::sync::Arc;
 
 // Buf is defined above.
@@ -131,8 +131,8 @@ pipeline.run(&mut ctx).unwrap();
 Wrappers are stages and compose freely as tuple elements:
 
 ```rust
-use pipex::metrics::Timed;
-use pipex::retry::Retry;
+use pipexec::metrics::Timed;
+use pipexec::retry::Retry;
 
 // Timed::new returns the wrapper and its metrics collector together.
 let (clamp, clamp_metrics) = Timed::new(Clamp);

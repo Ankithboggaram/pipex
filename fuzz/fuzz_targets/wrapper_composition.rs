@@ -1,12 +1,12 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use pipex::deadline::Deadline;
-use pipex::dynamic_pipeline::Pipeline;
-use pipex::error::PipelineError;
-use pipex::retry::Retry;
-use pipex::scratchpad::Scratchpad;
-use pipex::stage::Stage;
+use pipexec::deadline::Deadline;
+use pipexec::dynamic_pipeline::Pipeline;
+use pipexec::error::PipelineError;
+use pipexec::retry::Retry;
+use pipexec::scratchpad::Scratchpad;
+use pipexec::stage::Stage;
 use std::time::Duration;
 
 #[derive(Clone)]

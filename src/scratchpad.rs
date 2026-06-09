@@ -7,7 +7,7 @@
 
 /// A marker trait for types that can be used as a scratchpad in a pipeline.
 ///
-/// Implement this on your own struct to use it with `pipex`.
+/// Implement this on your own struct to use it with `pipexec`.
 ///
 /// For best performance on hot paths, consider aligning your scratchpad
 /// to a cache line boundary to avoid false sharing:
@@ -25,7 +25,7 @@
 ///     values: Vec<f32>,
 /// }
 ///
-/// impl pipex::scratchpad::Scratchpad for MyScratchpad {
+/// impl pipexec::scratchpad::Scratchpad for MyScratchpad {
 ///     fn reset(&mut self) {
 ///         self.values.clear();
 ///     }

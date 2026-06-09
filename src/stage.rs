@@ -24,9 +24,9 @@ use crate::scratchpad::Scratchpad;
 ///
 /// # Example
 /// ```
-/// use pipex::stage::Stage;
-/// use pipex::scratchpad::Scratchpad;
-/// use pipex::error::PipelineError;
+/// use pipexec::stage::Stage;
+/// use pipexec::scratchpad::Scratchpad;
+/// use pipexec::error::PipelineError;
 ///
 /// struct Buf { value: f32 }
 /// impl Scratchpad for Buf { fn reset(&mut self) { self.value = 0.0; } }

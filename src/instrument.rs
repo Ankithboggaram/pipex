@@ -21,11 +21,11 @@ use crate::stage::Stage;
 ///
 /// # Example
 /// ```
-/// use pipex::instrument::Instrumented;
-/// use pipex::stage::Stage;
-/// use pipex::scratchpad::Scratchpad;
-/// use pipex::error::PipelineError;
-/// use pipex::dynamic_pipeline::Pipeline;
+/// use pipexec::instrument::Instrumented;
+/// use pipexec::stage::Stage;
+/// use pipexec::scratchpad::Scratchpad;
+/// use pipexec::error::PipelineError;
+/// use pipexec::dynamic_pipeline::Pipeline;
 ///
 /// struct MyScratchpad;
 ///

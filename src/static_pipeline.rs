@@ -38,9 +38,9 @@ type StageFn<S> = fn(&mut S) -> Result<(), PipelineError>;
 ///
 /// # Example
 /// ```
-/// use pipex::static_pipeline::Pipeline;
-/// use pipex::scratchpad::Scratchpad;
-/// use pipex::error::PipelineError;
+/// use pipexec::static_pipeline::Pipeline;
+/// use pipexec::scratchpad::Scratchpad;
+/// use pipexec::error::PipelineError;
 ///
 /// struct Buf { value: f32 }
 ///

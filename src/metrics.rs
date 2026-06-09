@@ -194,11 +194,11 @@ impl StageMetrics {
 ///
 /// # Example
 /// ```
-/// use pipex::metrics::Timed;
-/// use pipex::stage::Stage;
-/// use pipex::scratchpad::Scratchpad;
-/// use pipex::error::PipelineError;
-/// use pipex::dynamic_pipeline::Pipeline;
+/// use pipexec::metrics::Timed;
+/// use pipexec::stage::Stage;
+/// use pipexec::scratchpad::Scratchpad;
+/// use pipexec::error::PipelineError;
+/// use pipexec::dynamic_pipeline::Pipeline;
 ///
 /// struct MyScratchpad;
 ///
@@ -235,10 +235,10 @@ impl<S: Scratchpad, T: Stage<S>> Timed<S, T> {
     /// use a shorter label.
     ///
     /// ```
-    /// # use pipex::metrics::Timed;
-    /// # use pipex::stage::Stage;
-    /// # use pipex::scratchpad::Scratchpad;
-    /// # use pipex::error::PipelineError;
+    /// # use pipexec::metrics::Timed;
+    /// # use pipexec::stage::Stage;
+    /// # use pipexec::scratchpad::Scratchpad;
+    /// # use pipexec::error::PipelineError;
     /// # struct S; impl Scratchpad for S { fn reset(&mut self) {} }
     /// # struct MyStage; impl Stage<S> for MyStage { fn run(&mut self, _: &mut S) -> Result<(), PipelineError> { Ok(()) } }
     /// let (my_stage, my_stage_metrics) = Timed::new(MyStage);
@@ -335,11 +335,11 @@ impl std::fmt::Display for PipelineSnapshot {
 ///
 /// # Example
 /// ```
-/// use pipex::metrics::{PipelineMetrics, Timed};
-/// use pipex::dynamic_pipeline::Pipeline;
-/// use pipex::scratchpad::Scratchpad;
-/// use pipex::stage::Stage;
-/// use pipex::error::PipelineError;
+/// use pipexec::metrics::{PipelineMetrics, Timed};
+/// use pipexec::dynamic_pipeline::Pipeline;
+/// use pipexec::scratchpad::Scratchpad;
+/// use pipexec::stage::Stage;
+/// use pipexec::error::PipelineError;
 ///
 /// struct MyScratchpad;
 /// impl Scratchpad for MyScratchpad {
@@ -381,11 +381,11 @@ impl PipelineMetrics {
     /// still include the stage in a [`PipelineSnapshot`]:
     ///
     /// ```
-    /// use pipex::metrics::{PipelineMetrics, Timed};
-    /// use pipex::stage::Stage;
-    /// use pipex::scratchpad::Scratchpad;
-    /// use pipex::error::PipelineError;
-    /// use pipex::dynamic_pipeline::Pipeline;
+    /// use pipexec::metrics::{PipelineMetrics, Timed};
+    /// use pipexec::stage::Stage;
+    /// use pipexec::scratchpad::Scratchpad;
+    /// use pipexec::error::PipelineError;
+    /// use pipexec::dynamic_pipeline::Pipeline;
     ///
     /// struct MyScratchpad;
     /// impl Scratchpad for MyScratchpad {

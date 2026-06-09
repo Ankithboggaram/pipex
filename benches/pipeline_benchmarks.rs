@@ -1,14 +1,14 @@
 use divan::{Bencher, black_box};
-use pipex::deadline::Deadline;
-use pipex::dynamic_pipeline::Pipeline as DynamicPipeline;
-use pipex::error::PipelineError;
-use pipex::instrument::Instrumented;
-use pipex::metrics::Timed;
-use pipex::pool::ScratchpadPool;
-use pipex::retry::Retry;
-use pipex::scratchpad::Scratchpad;
-use pipex::stage::Stage;
-use pipex::static_pipeline::Pipeline as StaticPipeline;
+use pipexec::deadline::Deadline;
+use pipexec::dynamic_pipeline::Pipeline as DynamicPipeline;
+use pipexec::error::PipelineError;
+use pipexec::instrument::Instrumented;
+use pipexec::metrics::Timed;
+use pipexec::pool::ScratchpadPool;
+use pipexec::retry::Retry;
+use pipexec::scratchpad::Scratchpad;
+use pipexec::stage::Stage;
+use pipexec::static_pipeline::Pipeline as StaticPipeline;
 use std::time::Duration;
 
 fn main() {
@@ -431,7 +431,7 @@ mod instrumentation_overhead {
 }
 
 // The headline comparison: bare sequential calls vs. pipex abstractions.
-// If pipex static is within noise of hand_written, the zero-overhead claim holds.
+// If pipexec static is within noise of hand_written, the zero-overhead claim holds.
 mod sequential_comparison {
     use super::*;
     use stages::*;
@@ -449,7 +449,7 @@ mod sequential_comparison {
         });
     }
 
-    // Manual function pointer array loop — what you'd write without pipex.
+    // Manual function pointer array loop — what you'd write without pipexec.
     #[divan::bench(args = [100, 10_000, 1_000_000])]
     fn fn_pointer_loop(bencher: Bencher, size: usize) {
         type StageFn = fn(&mut BenchScratchpad) -> Result<(), PipelineError>;
@@ -464,9 +464,9 @@ mod sequential_comparison {
         });
     }
 
-    // pipex static pipeline — function pointers, zero allocation.
+    // pipexec static pipeline — function pointers, zero allocation.
     #[divan::bench(args = [100, 10_000, 1_000_000])]
-    fn pipex_static(bencher: Bencher, size: usize) {
+    fn pipexec_static(bencher: Bencher, size: usize) {
         let mut pipeline = StaticPipeline::<BenchScratchpad, 3>::new();
         pipeline.add_stage(normalise).unwrap();
         pipeline.add_stage(clamp).unwrap();
@@ -479,9 +479,9 @@ mod sequential_comparison {
         });
     }
 
-    // pipex dynamic pipeline — boxed trait objects, runtime composition.
+    // pipexec dynamic pipeline — boxed trait objects, runtime composition.
     #[divan::bench(args = [100, 10_000, 1_000_000])]
-    fn pipex_dynamic(bencher: Bencher, size: usize) {
+    fn pipexec_dynamic(bencher: Bencher, size: usize) {
         let mut pipeline = DynamicPipeline::new()
             .stage(NormaliseStage)
             .stage(ClampStage)
@@ -494,9 +494,9 @@ mod sequential_comparison {
         });
     }
 
-    // pipex static + per-stage timing — cost of full observability on the hot path.
+    // pipexec static + per-stage timing — cost of full observability on the hot path.
     #[divan::bench(args = [100, 10_000, 1_000_000])]
-    fn pipex_static_timed(bencher: Bencher, size: usize) {
+    fn pipexec_static_timed(bencher: Bencher, size: usize) {
         let (normalise_timed, _normalise_metrics) = Timed::new(NormaliseStage);
         let (clamp_timed, _clamp_metrics) = Timed::new(ClampStage);
         let (scale_timed, _scale_metrics) = Timed::new(ScaleStage);

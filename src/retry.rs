@@ -23,16 +23,16 @@ use crate::stage::Stage;
 /// `Retry` clones the scratchpad before each attempt. For scratchpads that
 /// contain heap-allocated data (`Vec`, `String`, etc.) this allocates on
 /// every attempt, including the first. `Retry` is intentionally excluded
-/// from pipex's zero-allocation guarantee and should not be used on
+/// from pipexec's zero-allocation guarantee and should not be used on
 /// zero-allocation hot paths.
 ///
 /// # Example
 /// ```
-/// use pipex::retry::Retry;
-/// use pipex::stage::Stage;
-/// use pipex::scratchpad::Scratchpad;
-/// use pipex::error::PipelineError;
-/// use pipex::dynamic_pipeline::Pipeline;
+/// use pipexec::retry::Retry;
+/// use pipexec::stage::Stage;
+/// use pipexec::scratchpad::Scratchpad;
+/// use pipexec::error::PipelineError;
+/// use pipexec::dynamic_pipeline::Pipeline;
 ///
 /// #[derive(Clone)]
 /// struct MyScratchpad { value: f32 }

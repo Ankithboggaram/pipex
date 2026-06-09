@@ -1,9 +1,9 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use pipex::error::PipelineError;
-use pipex::scratchpad::Scratchpad;
-use pipex::static_pipeline::Pipeline;
+use pipexec::error::PipelineError;
+use pipexec::scratchpad::Scratchpad;
+use pipexec::static_pipeline::Pipeline;
 
 struct FuzzScratchpad {
     value: u64,

@@ -9,10 +9,10 @@
 //! # Example
 //!
 //! ```rust
-//! use pipex::stage::Stage;
-//! use pipex::scratchpad::Scratchpad;
-//! use pipex::error::PipelineError;
-//! use pipex::metrics::Timed;
+//! use pipexec::stage::Stage;
+//! use pipexec::scratchpad::Scratchpad;
+//! use pipexec::error::PipelineError;
+//! use pipexec::metrics::Timed;
 //!
 //! struct Buf {
 //!     value: f32,

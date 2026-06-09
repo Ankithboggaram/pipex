@@ -1,7 +1,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use pipex::metrics::StageMetrics;
+use pipexec::metrics::StageMetrics;
 
 fuzz_target!(|data: &[u8]| {
     if data.len() < 2 {

@@ -1,4 +1,4 @@
-//! pipex is a zero-allocation stage executor for deterministic workloads. Stages
+//! pipexec is a zero-allocation stage executor for deterministic workloads. Stages
 //! transform a shared scratchpad buffer in sequence; data lives in the scratchpad,
 //! the pipeline is reusable logic, and the two meet only at `pipeline.run(&mut ctx)`.
 //! Every stage can be timed, traced, and named with no changes to the pipeline or
@@ -82,9 +82,9 @@
 //! # Example
 //!
 //! ```rust
-//! use pipex::scratchpad::Scratchpad;
-//! use pipex::stage::Stage;
-//! use pipex::error::PipelineError;
+//! use pipexec::scratchpad::Scratchpad;
+//! use pipexec::stage::Stage;
+//! use pipexec::error::PipelineError;
 //!
 //! struct Buffer {
 //!     values: Vec<f32>,

@@ -1,12 +1,12 @@
-use pipex::deadline::Deadline;
-use pipex::dynamic_pipeline::Pipeline as DynamicPipeline;
-use pipex::error::PipelineError;
-use pipex::metrics::{PipelineMetrics, Timed};
-use pipex::pool::ScratchpadPool;
-use pipex::retry::Retry;
-use pipex::scratchpad::Scratchpad;
-use pipex::stage::Stage;
-use pipex::static_pipeline::Pipeline as StaticPipeline;
+use pipexec::deadline::Deadline;
+use pipexec::dynamic_pipeline::Pipeline as DynamicPipeline;
+use pipexec::error::PipelineError;
+use pipexec::metrics::{PipelineMetrics, Timed};
+use pipexec::pool::ScratchpadPool;
+use pipexec::retry::Retry;
+use pipexec::scratchpad::Scratchpad;
+use pipexec::stage::Stage;
+use pipexec::static_pipeline::Pipeline as StaticPipeline;
 use std::sync::Arc;
 use std::time::Duration;
 

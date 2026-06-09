@@ -1,8 +1,8 @@
-use pipex::dynamic_pipeline::Pipeline as DynamicPipeline;
-use pipex::error::PipelineError;
-use pipex::scratchpad::Scratchpad;
-use pipex::stage::Stage;
-use pipex::static_pipeline::Pipeline as StaticPipeline;
+use pipexec::dynamic_pipeline::Pipeline as DynamicPipeline;
+use pipexec::error::PipelineError;
+use pipexec::scratchpad::Scratchpad;
+use pipexec::stage::Stage;
+use pipexec::static_pipeline::Pipeline as StaticPipeline;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 

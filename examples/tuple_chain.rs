@@ -5,11 +5,11 @@
 //!
 //! Run with: cargo run --example tuple_chain
 
-use pipex::error::PipelineError;
-use pipex::metrics::Timed;
-use pipex::retry::Retry;
-use pipex::scratchpad::Scratchpad;
-use pipex::stage::Stage;
+use pipexec::error::PipelineError;
+use pipexec::metrics::Timed;
+use pipexec::retry::Retry;
+use pipexec::scratchpad::Scratchpad;
+use pipexec::stage::Stage;
 
 #[derive(Clone)]
 struct Buf {

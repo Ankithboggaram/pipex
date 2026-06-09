@@ -17,10 +17,10 @@
 //!
 //! ```
 //! use std::sync::Arc;
-//! use pipex::pool::ScratchpadPool;
-//! use pipex::static_pipeline::Pipeline;
-//! use pipex::scratchpad::Scratchpad;
-//! use pipex::error::PipelineError;
+//! use pipexec::pool::ScratchpadPool;
+//! use pipexec::static_pipeline::Pipeline;
+//! use pipexec::scratchpad::Scratchpad;
+//! use pipexec::error::PipelineError;
 //!
 //! struct Buf { value: f32 }
 //!
