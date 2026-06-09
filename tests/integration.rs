@@ -43,7 +43,7 @@ impl Stage<MlScratchpad> for NormaliseStage {
         if max == 0.0 {
             return Err(PipelineError::StageFailed {
                 stage: "NormaliseStage",
-                message: String::from("cannot normalise: max value is zero"),
+                source: "cannot normalise: max value is zero".into(),
             });
         }
         ctx.normalised
@@ -72,7 +72,7 @@ impl Stage<MlScratchpad> for AlwaysFailStage {
     fn run(&mut self, _ctx: &mut MlScratchpad) -> Result<(), PipelineError> {
         Err(PipelineError::StageFailed {
             stage: "AlwaysFailStage",
-            message: String::from("intentional failure"),
+            source: "intentional failure".into(),
         })
     }
 }
@@ -83,7 +83,7 @@ fn normalise(ctx: &mut MlScratchpad) -> Result<(), PipelineError> {
     if max == 0.0 {
         return Err(PipelineError::StageFailed {
             stage: "normalise",
-            message: String::from("cannot normalise: max value is zero"),
+            source: "cannot normalise: max value is zero".into(),
         });
     }
     ctx.normalised
@@ -232,7 +232,7 @@ mod retry_tests {
                 ctx.normalised.iter_mut().for_each(|x| *x = 99.0);
                 Err(PipelineError::StageFailed {
                     stage: "WriteAndFail",
-                    message: String::from("fail"),
+                    source: "fail".into(),
                 })
             }
         }

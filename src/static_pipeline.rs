@@ -196,7 +196,7 @@ mod tests {
     fn failing(_ctx: &mut TestScratchpad) -> Result<(), PipelineError> {
         Err(PipelineError::StageFailed {
             stage: "failing",
-            message: String::from("intentional failure"),
+            source: "intentional failure".into(),
         })
     }
 

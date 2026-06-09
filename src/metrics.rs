@@ -450,7 +450,7 @@ mod tests {
         fn run(&mut self, _ctx: &mut TestScratchpad) -> Result<(), PipelineError> {
             Err(PipelineError::StageFailed {
                 stage: "FailStage",
-                message: String::from("fail"),
+                source: "fail".into(),
             })
         }
     }
@@ -529,7 +529,7 @@ mod tests {
                 if self.0 % 4 == 0 {
                     Err(PipelineError::StageFailed {
                         stage: "SometimesFailStage",
-                        message: String::from("scheduled"),
+                        source: "scheduled".into(),
                     })
                 } else {
                     Ok(())

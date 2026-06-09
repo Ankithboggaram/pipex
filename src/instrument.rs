@@ -109,7 +109,7 @@ mod tests {
         fn run(&mut self, _ctx: &mut TestScratchpad) -> Result<(), PipelineError> {
             Err(PipelineError::StageFailed {
                 stage: "FailStage",
-                message: String::from("fail"),
+                source: "fail".into(),
             })
         }
     }

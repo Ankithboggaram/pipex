@@ -124,7 +124,7 @@ mod tests {
         fn run(&mut self, _ctx: &mut TestScratchpad) -> Result<(), PipelineError> {
             Err(PipelineError::StageFailed {
                 stage: "FailingStage",
-                message: String::from("intentional failure"),
+                source: "intentional failure".into(),
             })
         }
     }

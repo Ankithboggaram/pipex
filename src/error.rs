@@ -12,12 +12,12 @@ pub enum PipelineError {
     /// A stage failed during execution.
     ///
     /// `stage` is the name of the stage type or function that failed.
-    /// `message` describes what went wrong.
+    /// The underlying error is accessible via [`std::error::Error::source`].
     StageFailed {
         /// Name of the stage type or function that failed.
         stage: &'static str,
-        /// Human-readable description of what went wrong.
-        message: String,
+        /// The underlying error returned by the stage.
+        source: Box<dyn std::error::Error + Send + Sync>,
     },
 
     /// The pipeline has no stages to execute.
@@ -62,8 +62,8 @@ pub enum PipelineError {
 impl std::fmt::Display for PipelineError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PipelineError::StageFailed { stage, message } => {
-                write!(f, "stage '{stage}' failed: {message}")
+            PipelineError::StageFailed { stage, source } => {
+                write!(f, "stage '{stage}' failed: {source}")
             }
             PipelineError::EmptyPipeline => write!(f, "pipeline has no stages"),
             PipelineError::FullPipeline => write!(f, "pipeline has no more room to grow"),
@@ -89,6 +89,7 @@ impl std::fmt::Display for PipelineError {
 impl std::error::Error for PipelineError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            PipelineError::StageFailed { source, .. } => Some(source.as_ref()),
             PipelineError::RetryExhausted { source, .. } => Some(source.as_ref()),
             _ => None,
         }
@@ -103,9 +104,18 @@ mod tests {
     fn stage_failed_contains_message() {
         let error = PipelineError::StageFailed {
             stage: "test",
-            message: String::from("something went wrong"),
+            source: "something went wrong".into(),
         };
-        assert!(format!("{error:?}").contains("something went wrong"));
+        assert!(format!("{error}").contains("something went wrong"));
+    }
+
+    #[test]
+    fn stage_failed_source_is_accessible() {
+        let error = PipelineError::StageFailed {
+            stage: "test",
+            source: "underlying error".into(),
+        };
+        assert!(std::error::Error::source(&error).is_some());
     }
 
     #[test]
@@ -132,7 +142,7 @@ mod tests {
             attempts: 3,
             source: Box::new(PipelineError::StageFailed {
                 stage: "test",
-                message: String::from("timed out"),
+                source: "timed out".into(),
             }),
         };
         assert!(format!("{error:?}").contains('3'));

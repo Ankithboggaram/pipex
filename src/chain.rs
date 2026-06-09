@@ -123,7 +123,7 @@ mod tests {
         fn run(&mut self, _ctx: &mut Buf) -> Result<(), PipelineError> {
             Err(PipelineError::StageFailed {
                 stage: "Fail",
-                message: String::from("intentional"),
+                source: "intentional".into(),
             })
         }
     }
