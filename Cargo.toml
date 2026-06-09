@@ -9,7 +9,7 @@ repository = "https://github.com/Ankithboggaram/pipex"
 homepage = "https://github.com/Ankithboggaram/pipex"
 readme = "README.md"
 keywords = ["pipeline", "zero-allocation", "real-time", "embedded", "inference"]
-categories = ["rust-patterns", "algorithms", "science::ml"]
+categories = ["rust-patterns", "algorithms", "science"]
 
 [package.metadata.docs.rs]
 all-features = false
