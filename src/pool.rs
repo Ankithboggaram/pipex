@@ -1,16 +1,16 @@
 //! Thread-safe pool of pre-allocated scratchpads for concurrent workloads.
 //!
-//! Share one pipeline via [`Arc`][std::sync::Arc] across all threads; each
+//! Share one pipeline via [`Arc`] across all threads; each
 //! thread acquires a [`ScratchpadGuard`] from the pool, runs the pipeline, and
 //! on drop the scratchpad is reset and returned. Scratchpads beyond the pool
 //! capacity are dropped rather than cached, bounding memory use.
 //!
 //! For async callers that need to hold a guard across `.await` points, use
 //! [`ScratchpadPool::acquire_owned`], which returns an [`OwnedScratchpadGuard`]
-//! that holds an [`Arc`][std::sync::Arc] clone of the pool and is freely `Send`.
+//! that holds an [`Arc`] clone of the pool and is freely `Send`.
 //!
 //! With pipelines decoupled from their scratchpad, the typical concurrent
-//! pattern is to share a single [`static_pipeline::Pipeline`][crate::static_pipeline::Pipeline] via [`Arc`][std::sync::Arc] and
+//! pattern is to share a single [`static_pipeline::Pipeline`][crate::static_pipeline::Pipeline] via [`Arc`] and
 //! pool only the scratchpads, one per concurrent caller.
 //!
 //! # Example
@@ -55,7 +55,7 @@ use crate::scratchpad::Scratchpad;
 
 /// A thread-safe pool of scratchpads for concurrent pipeline workloads.
 ///
-/// Share one pipeline via [`Arc`][std::sync::Arc] across all threads; each thread acquires its
+/// Share one pipeline via [`Arc`] across all threads; each thread acquires its
 /// own [`ScratchpadGuard`] from this pool. On drop, [`Scratchpad::reset`] is
 /// called and the scratchpad is returned. Scratchpads beyond
 /// [`capacity`][ScratchpadPool::capacity] are dropped rather than cached,
@@ -103,7 +103,7 @@ impl<S: Scratchpad + Send> ScratchpadPool<S> {
     /// The returned [`OwnedScratchpadGuard`] holds an [`Arc`] clone of the pool
     /// rather than a borrowed reference, so it carries no lifetime annotation
     /// and is `'static`. This satisfies the `Future: 'static` requirement of
-    /// [`tokio::spawn`] and async trait methods in frameworks like tonic, where
+    /// `tokio::spawn` and async trait methods in frameworks like tonic, where
     /// a lifetime-bound [`ScratchpadGuard`] would not compile.
     ///
     /// Use [`acquire`][Self::acquire] at synchronous call sites; it avoids the
@@ -175,7 +175,7 @@ impl<S: Scratchpad + Send> DerefMut for ScratchpadGuard<'_, S> {
 /// Identical to [`ScratchpadGuard`] in behaviour — resets and returns the
 /// scratchpad on drop — but holds an [`Arc`] clone of the pool instead of a
 /// borrowed reference. This makes the guard `'static`, which is required for
-/// futures spawned with [`tokio::spawn`] or held in async trait methods.
+/// futures spawned with `tokio::spawn` or held in async trait methods.
 pub struct OwnedScratchpadGuard<S: Scratchpad + Send> {
     scratchpad: Option<S>,
     pool: Arc<ScratchpadPool<S>>,
