@@ -7,6 +7,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-06-08
+
+### Fixed
+- Corrected crates.io categories: replaced `embedded` (implies `no_std`, which this
+  crate does not support) and `concurrency` with `algorithms` and `science::ml`.
+
 ## [0.3.0] - 2026-06-08
 
 ### Added

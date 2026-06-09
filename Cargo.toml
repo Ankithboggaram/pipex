@@ -1,6 +1,6 @@
 [package]
 name = "pipexec"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 rust-version = "1.85"
 description = "Zero-allocation, deterministic pipeline runtime for staged computation in Rust."
@@ -9,7 +9,7 @@ repository = "https://github.com/Ankithboggaram/pipex"
 homepage = "https://github.com/Ankithboggaram/pipex"
 readme = "README.md"
 keywords = ["pipeline", "zero-allocation", "real-time", "embedded", "inference"]
-categories = ["embedded", "concurrency", "rust-patterns"]
+categories = ["rust-patterns", "algorithms", "science::ml"]
 
 [package.metadata.docs.rs]
 all-features = false
