@@ -1,5 +1,7 @@
 # pipex
 
+[![crates.io](https://img.shields.io/crates/v/pipex.svg)](https://crates.io/crates/pipex)
+[![docs.rs](https://docs.rs/pipex/badge.svg)](https://docs.rs/pipex)
 [![CI](https://github.com/Ankithboggaram/pipex/actions/workflows/ci.yml/badge.svg)](https://github.com/Ankithboggaram/pipex/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![MSRV](https://img.shields.io/badge/rustc-1.85+-orange.svg)](rust-toolchain.toml)
@@ -14,7 +16,7 @@ Individual pipeline stages transform a shared scratchpad in sequence. The pipeli
 
 ```toml
 [dependencies]
-pipex = "0.2"
+pipex = "0.3"
 ```
 
 ---
